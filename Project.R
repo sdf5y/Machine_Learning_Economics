@@ -18,6 +18,8 @@ library(scales)
 library(corrplot)
 library(clustMixType)
 library(wesanderson)
+#install.packages("zipcodeR")
+library(zipcodeR)
 
 #Loading The Data----
 
@@ -38,9 +40,6 @@ group3$relief<- ifelse(group3$Company.response.to.consumer %in% c("Closed with m
 group3$drop<- as.numeric(group3$State %in% c("NONE", "None", "DC", "AA", "AS", "FM","GU", "MH", "MP", "PR", "VI", "UNITED STATES MINOR OUTLYING ISLANDS"))
 
 #Cleaning-----
-unique_zips <- unique(fips_data$ZIP)
-
-unique(group3$Company.response.to.consumer)
 
 group3 <- group3 %>%
   mutate(Company.response.to.consumer = case_when(Company.response.to.consumer == "In progress" ~ 0,
@@ -50,9 +49,6 @@ group3 <- group3 %>%
                                                   Company.response.to.consumer == "Closed with monetary relief" ~ 4,
                                                   Company.response.to.consumer == "Closed" ~ 5))
    
-unique(group3$Product) #one category
-unique(group3$Sub.product) #19 types of sub categories of debt
-
 group3 <- group3 %>%
   mutate(Sub.product = case_when(Sub.product == "Other debt" ~ "Misc. debt",
                                  Sub.product == 'Other (i.e. phone, health club, etc.)' ~ "Misc. debt",
@@ -85,7 +81,59 @@ group3 <- group3 %>%
                            Issue == "Written notification about debt" ~ "Debt Notifications",
                            Issue == "Electronic communications"   ~ "Debt Notifications") )
                                  
+
+
 unique(group3$Company.public.response)
+
+group3 <- group3 %>%
+  mutate(Company.public.response = case_when(Company.public.response == "Company has responded to the consumer and the CFPB and chooses not to provide a public response" ~ "No Comment",
+                                           Company.public.response == "Company chooses not to provide a public response" ~ "No Comment",
+                                           Company.public.response == "Company believes complaint represents an opportunity for improvement to better serve consumers" ~ "Improve Service",
+                                           Company.public.response == "Company believes the complaint provided an opportunity to answer consumer's questions" ~ "Improve Service",
+                                           Company.public.response == "Company believes the complaint is the result of a misunderstanding" ~ "Misunderstanding",
+                                           Company.public.response == "Company believes complaint is the result of an isolated error" ~ "Misunderstanding"),
+         Consumer.consent.provided. = case_when(Consumer.consent.provided. == "Consent provided" ~ "Consent provided",
+                                                Consumer.consent.provided. == "None"  ~ "No consent provided",
+                                                Consumer.consent.provided. == "Consent not provided"  ~ "No consent provided",
+                                                Consumer.consent.provided. == "Other"  ~ "No consent provided",
+                                                Consumer.consent.provided. == "Consent withdrawn"   ~ "No consent provided",
+                                                Consumer.consent.provided. == "N/A" ~ "No consent provided",))
+
+
+
+
+
+#Zip code cleaning 
+
+#Get all unique zips in our dataset
+unique_zips <- unique(fips_data$ZIP)
+
+#Get all unique USA zips
+USA_zippop <- zip_code_db
+
+#Map zips in our data not in the USA zip file
+zip_binary_map <- ifelse(unique_zips %in% USA_zippop$zipcode, T,F)
+
+#Isolate zip indicies not in USA zip file
+rows_false <- zip_binary_map[zip_binary_map == FALSE ]
+
+#Subset list of unclean zips
+unclean_zips <- fips_data$ZIP[zip_binary_map == FALSE]
+
+#Place a leading '0' for the problem zips
+zip <- as.character(unclean_zips)
+for(i in 1:length(zip)){
+  if(as.numeric(zip[i]) < 10000){
+    zip[i] <- paste0("0", zip[i])
+  }
+}
+
+#retest leading zips if they are correct zips
+zip_binary_map_1 <- ifelse((zip) %in% USA_zippop$zipcode, T,F)
+
+table(zip_binary_map_1) # missing 179 zip codes. To save time, we are dropping these variables
+
+#
 
 
 ### Clustering code -----
