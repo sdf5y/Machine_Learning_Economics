@@ -23,10 +23,10 @@ library(zipcodeR)
 
 #Loading The Data----
 
-group3 <- read.csv("group3.csv")
+group3 <- read_csv("group3.csv")
 group3 <- group3[-1] #inefficient, but works
 
-fips_data <- read.csv("zip_fips.csv")
+fips_data <- read_csv("zip_fips.csv")
 fips_data <- fips_data[-1]#inefficient, but works
 
 #Isolating the Dependent Variable-----
@@ -36,11 +36,13 @@ group3$relief<- ifelse(group3$Company.response.to.consumer %in% c("Closed with m
                                                                   "Closed with non-monetary relief"),
                        1,0)
 
-### drop non states- already run. 
-group3$drop<- as.numeric(group3$State %in% c("NONE", "None", "DC", "AA", "AS", "FM","GU", "MH", "MP", "PR", "VI", "UNITED STATES MINOR OUTLYING ISLANDS"))
-
 #Cleaning-----
-#we can also change these to actual numbers, but we can also use dummies of same names. ----
+
+#drop non states 
+group3$drop<- as.numeric(group3$State %in% c("NONE", "None", "DC", "AA", "AS", "FM","GU", "MH", "MP", "PR", "VI", "UNITED STATES MINOR OUTLYING ISLANDS"))
+fips_data <- fips_data[!fips_data$STATE %in% c("NONE", "None", "DC", "AA", "AS", "FM","GU", "MH", "MP", "PR", "VI", "UNITED STATES MINOR OUTLYING ISLANDS"),]
+
+#Named Factors ----
 group3 <- group3 %>%
   mutate(Company.response.to.consumer = case_when(Company.response.to.consumer == "In progress" ~ 0,
                                                   Company.response.to.consumer == "Closed with explanation" ~ 1,
@@ -91,7 +93,7 @@ group3 <- group3 %>%
                                                 Consumer.consent.provided. == "Consent withdrawn"   ~ "No consent provided",
                                                 Consumer.consent.provided. == "N/A" ~ "No consent provided"))
 
-#numeric Factor categories----
+#Numbered Factors ----
 group3 <- group3 %>%
   mutate(Company.response.to.consumer = case_when(Company.response.to.consumer == "In progress" ~ 0,
                                                   Company.response.to.consumer == "Closed with explanation" ~ 1,
@@ -147,32 +149,25 @@ group3$Dispute_prior <- ifelse(group3$Date.received  > '04/24/17', 1,0)
 
 unique(group3$Company.response.to.consumer)
 
-#Zip code cleaning -----
+#Zip Code Cleaning -----
 
-#dummy for incorrect zip codes (less than 4 digits)
-group3$zipcode_error <- ifelse(group3$ZIP.code < 10000, 0,1)
+#Evaluate the number of incorrect zip codes ----
+group3$zipcode_error <- ifelse(group3$ZIP.code < 10000, 0,1) #assuming less than 4 digits as incorrect
 
 table(group3$zipcode_error) #2751 incorrect zip codes, 40,000 correct ones
 
 t.test(table(group3$zipcode_error), alternative = 'two.sided') #fail to reject the null - not significant at 5% level
 
-#Get all unique zips in our dataset
-unique_zips <- unique(fips_data$ZIP)
 
-#Get all unique USA zips
-USA_zippop <- zip_code_db
+#Fips Zips -----
+unique_zips <- unique(fips_data$ZIP) #unique fips zips
+USA_zippop <- zip_code_db #unique usa zips
 
 #Map zips in our data not in the USA zip file
 zip_binary_map <- ifelse(unique_zips %in% USA_zippop$zipcode, T,F)
 
-#Isolate zip indicies not in USA zip file
-rows_false <- zip_binary_map[zip_binary_map == FALSE ]
-
-#Subset list of unclean zips
-unclean_zips <- fips_data$ZIP[zip_binary_map == FALSE]
-
-#Place a leading '0' for the problem zips
-zip <- as.character(unclean_zips)
+#Place a leading zero for the problem zips
+zip <- as.character(fips_data$ZIP[zip_binary_map == FALSE])
 for(i in 1:length(zip)){
   if(as.numeric(zip[i]) < 10000){
     zip[i] <- paste0("0", zip[i])
@@ -180,38 +175,53 @@ for(i in 1:length(zip)){
 }
 
 #retest leading zips if they are correct zips
-zip_binary_map_1 <- ifelse((zip) %in% USA_zippop$zipcode, T,F)
 
-table(zip_binary_map_1) # 179 zip codes are still incorrect. To save time, we are dropping these variables
+table(ifelse(zip %in% USA_zippop$zipcode, T,F)) # 2 zip codes are still incorrect. To save time, we are dropping these variables
 
-#recreate zips 
+#recreate zips in fips data
 
+fips_data$ZIP[which(zip_binary_map == F)] <- zip
 
+table(ifelse(fips_data$ZIP %in% USA_zippop$zipcode, T,F))
 
-#data_na$entry2 <- replace(df$entry2, df$entry2 < 0, NA)
+#Dataset zip----
+unique_zips <- unique(group3$ZIP.code)
 
-replace(group3$ZIP.code, zip_binary_map_1 == T, zip)
-drop_zips <- zip[zip_binary_map_1 == F]
+#Get all unique USA zips----
+USA_zippop <- zip_code_db
 
-indicies_zip <- which(zip_binary_map == F, arr.ind = TRUE)
+#Map zips in our data not in the USA zip file
+zip_binary_map <- ifelse(unique_zips %in% USA_zippop$zipcode, T,F)
 
-#using a loop to replace zips by indices 
-for (i in indicies_zip){
-  cell <- indicies_zip[i] 
-  replace(unique_zips[cell],   ) 
+#Place a leading zero for the problem zips
+zip <- as.character(fips_data$ZIP[zip_binary_map == FALSE])
+for(i in 1:length(zip)){
+  if(as.numeric(zip[i]) < 10000){
+    zip[i] <- paste0("0", zip[i])
+  }
 }
 
+#retest leading zips if they are correct zips
 
-#fix here
+table(ifelse(zip %in% USA_zippop$zipcode, T,F)) # 158 zip codes are still incorrect. To save time, we are dropping these variables
 
+#recreate zips indata
 
+group3$ZIP.code[which(zip_binary_map == F)] <- zip
 
+table(ifelse(fips_data$ZIP %in% USA_zippop$zipcode, T,F))
 
+#rm(i, zip, zip_binary_map, zip_binary_map_1, unique_zips, unclean_zips) #remove these variables when done.
 
+'''
+here is a good stab at addressing the zip code issue in our data. 
+But their are other problems. 
+The fips dataset is simple to correct because it just needs leading zeros.
+The main dataset has mismatched zips with states even before addressing other errors.
+We should consider using the clean fips dataset to match and replace states that are not a pair between their zip and state.
+Then we could impute zips for high density areas in each state for these problem selections.
 
-
-
-
+'''
 
 
 
