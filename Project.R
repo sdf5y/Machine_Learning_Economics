@@ -37,14 +37,25 @@ group3$relief<- ifelse(group3$Company.response.to.consumer %in% c("Closed with m
 ### drop non states- already run. 
 group3$drop<- as.numeric(group3$State %in% c("NONE", "None", "DC", "AA", "AS", "FM","GU", "MH", "MP", "PR", "VI", "UNITED STATES MINOR OUTLYING ISLANDS"))
 
-### Clustering code 
+#Cleaning-----
+unique_zips <- unique(fips_data$ZIP)
+
+
+
+
+
+
+
+
+
+### Clustering code -----
 # make a separate dataset, and then make sure each variable is the right class. 
-ca <- group3[, c( "Sub.product" ,
-              "Issue" ,
-              "Share.with.any.debt.in.collections..All" ,
-              "Share.of.people.of.color",
-              "Average.household.income..All",
-              "pct_female")    ]
+ca <- group3[, c("Sub.product",
+                 "Issue",
+                 "Share.with.any.debt.in.collections..All" ,
+                 "Share.of.people.of.color",
+                 "Average.household.income..All",
+                 "pct_female")    ]
 ca[,1]<- as.factor(ca[,1] )
 ca[,2]<- as.factor(ca[,2] )
 ca[,3]<- scale(as.numeric(ca[,3] ))
@@ -70,11 +81,6 @@ for(i in 1:n.scree){
 plot(1:n.scree, Es[1:5], type="b",ylab="ObjectiveFunction",
      xlab="#Clusters", main="ScreePlot") #figure2
 
-
-
-
-#Cleaning-----
-unique_zips <- unique(fips_data$ZIP)
 
 
 
