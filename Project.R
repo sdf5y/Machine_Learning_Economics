@@ -40,8 +40,7 @@ group3$relief<- ifelse(group3$Company.response.to.consumer %in% c("Closed with m
 group3$drop<- as.numeric(group3$State %in% c("NONE", "None", "DC", "AA", "AS", "FM","GU", "MH", "MP", "PR", "VI", "UNITED STATES MINOR OUTLYING ISLANDS"))
 
 #Cleaning-----
-
-#we can also change these to actual numbers, but we can also use dummies of same names. 
+#we can also change these to actual numbers, but we can also use dummies of same names. ----
 group3 <- group3 %>%
   mutate(Company.response.to.consumer = case_when(Company.response.to.consumer == "In progress" ~ 0,
                                                   Company.response.to.consumer == "Closed with explanation" ~ 1,
@@ -90,8 +89,58 @@ group3 <- group3 %>%
                                                 Consumer.consent.provided. == "Consent not provided"  ~ "No consent provided",
                                                 Consumer.consent.provided. == "Other"  ~ "No consent provided",
                                                 Consumer.consent.provided. == "Consent withdrawn"   ~ "No consent provided",
-                                                Consumer.consent.provided. == "N/A" ~ "No consent provided",))
-unique(group3$Sub.product)
+                                                Consumer.consent.provided. == "N/A" ~ "No consent provided"))
+
+#numeric Factor categories----
+group3 <- group3 %>%
+  mutate(Company.response.to.consumer = case_when(Company.response.to.consumer == "In progress" ~ 0,
+                                                  Company.response.to.consumer == "Closed with explanation" ~ 1,
+                                                  Company.response.to.consumer == "Untimely response" ~ 2,
+                                                  Company.response.to.consumer == "Closed with non-monetary relief" ~ 3,
+                                                  Company.response.to.consumer == "Closed with monetary relief" ~ 4,
+                                                  Company.response.to.consumer == "Closed" ~ 5),
+         Sub.product = case_when(Sub.product == "Other debt" ~ 0,
+                                 Sub.product == 'Other (i.e. phone, health club, etc.)' ~ 0,
+                                 Sub.product == "Telecommunications debt" ~ 0,
+                                 Sub.product == 'I do not know' ~ 0,
+                                 Sub.product == "Federal student loan debt" ~ 1,
+                                 Sub.product == "Federal student loan"   ~ 1,
+                                 Sub.product == "Private student loan debt" ~ 2,
+                                 Sub.product == "Non-federal student loan"  ~ 2,
+                                 Sub.product == "Auto" ~ 3,
+                                 Sub.product == "Auto debt" ~ 3,
+                                 Sub.product == "Credit card debt" ~ 4,
+                                 Sub.product == "Credit card" ~ 4, 
+                                 Sub.product == 'Morgage debt'~ 5, 
+                                 Sub.product == "Mortgage" ~ 5,
+                                 Sub.product == 'Medical' ~ 6,
+                                 Sub.product == "Medical debt" ~ 6,
+                                 Sub.product == "Rental debt" ~ 7,
+                                 Sub.product == "Payday loan debt" ~ 8,
+                                 Sub.product == "Payday loan" ~ 8),
+         Issue = case_when(Issue == "Attempts to collect debt not owed" ~ 0,
+                           Issue == 'Cont\'d attempts collect debt not owed' ~ 0,
+                           Issue == "Took or threatened to take negative or legal action" ~ 1,
+                           Issue == 'Taking/threatening an illegal action' ~ 1,
+                           Issue == "Threatened to contact someone or share information improperly" ~ 2,
+                           Issue == "Communication tactics" ~ 2,
+                           Issue == "False statements or representation" ~ 2,
+                           Issue == "Disclosure verification of debt" ~ 2,
+                           Issue == "Improper contact or sharing of info" ~ 2,
+                           Issue == "Written notification about debt" ~ 3,
+                           Issue == "Electronic communications"   ~ 3),
+         Company.public.response = case_when(Company.public.response == "Company has responded to the consumer and the CFPB and chooses not to provide a public response" ~ 0,
+                                             Company.public.response == "Company chooses not to provide a public response" ~ 0,
+                                             Company.public.response == "Company believes complaint represents an opportunity for improvement to better serve consumers" ~ 1,
+                                             Company.public.response == "Company believes the complaint provided an opportunity to answer consumer's questions" ~ 1,
+                                             Company.public.response == "Company believes the complaint is the result of a misunderstanding" ~ 2,
+                                             Company.public.response == "Company believes complaint is the result of an isolated error" ~ 2),
+         Consumer.consent.provided. = case_when(Consumer.consent.provided. == "Consent provided" ~ 1,
+                                                Consumer.consent.provided. == "None"  ~ 0,
+                                                Consumer.consent.provided. == "Consent not provided"  ~ 0,
+                                                Consumer.consent.provided. == "Other"  ~ 0,
+                                                Consumer.consent.provided. == "Consent withdrawn"   ~ 0,
+                                                Consumer.consent.provided. == "N/A" ~ 0))
 
 #Dummy for after date (form changes NA imputation)
 group3$Dispute_prior <- ifelse(group3$Date.received  > '04/24/17', 1,0)
@@ -99,6 +148,13 @@ group3$Dispute_prior <- ifelse(group3$Date.received  > '04/24/17', 1,0)
 unique(group3$Company.response.to.consumer)
 
 #Zip code cleaning -----
+
+#dummy for incorrect zip codes (less than 4 digits)
+group3$zipcode_error <- ifelse(group3$ZIP.code < 10000, 0,1)
+
+table(group3$zipcode_error) #2751 incorrect zip codes, 40,000 correct ones
+
+t.test(table(group3$zipcode_error), alternative = 'two.sided') #fail to reject the null - not significant at 5% level
 
 #Get all unique zips in our dataset
 unique_zips <- unique(fips_data$ZIP)
@@ -130,7 +186,7 @@ table(zip_binary_map_1) # 179 zip codes are still incorrect. To save time, we ar
 
 #recreate zips 
 
-subset(zip_binary_map_1)
+
 
 #data_na$entry2 <- replace(df$entry2, df$entry2 < 0, NA)
 
