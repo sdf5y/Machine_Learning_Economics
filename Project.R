@@ -72,9 +72,20 @@ group3 <- group3 %>%
                                  Sub.product == "Medical debt" ~ "Medical debt",
                                  Sub.product == "Rental debt" ~ "Rental debt",
                                  Sub.product == "Payday loan debt" ~ "Payday debt",
-                                 Sub.product == "Payday loan" ~ "Payday debt")) #missing one variable, lets check it later
+                                 Sub.product == "Payday loan" ~ "Payday debt"),
+         Issue = case_when(Issue == "Attempts to collect debt not owed" ~ "Collect Debt Not Owed",
+                           Issue == 'Cont\'d attempts collect debt not owed' ~ "Collect Debt Not Owed",
+                           Issue == "Took or threatened to take negative or legal action" ~ "Aggressive Response",
+                           Issue == 'Taking/threatening an illegal action' ~ "Aggressive Response",
+                           Issue == "Threatened to contact someone or share information improperly" ~ "Improper Communication Tactic",
+                           Issue == "Communication tactics" ~ "Improper Communication Tactic",
+                           Issue == "False statements or representation" ~ "Improper Communication Tactic",
+                           Issue == "Disclosure verification of debt" ~ "Improper Communication Tactic",
+                           Issue == "Improper contact or sharing of info" ~ "Improper Communication Tactic",
+                           Issue == "Written notification about debt" ~ "Debt Notifications",
+                           Issue == "Electronic communications"   ~ "Debt Notifications") )
                                  
-unique(group3$Sub.product)                                 
+unique(group3$Company.public.response)
 
 
 ### Clustering code -----
