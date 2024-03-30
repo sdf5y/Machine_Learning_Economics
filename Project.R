@@ -41,16 +41,15 @@ group3$drop<- as.numeric(group3$State %in% c("NONE", "None", "DC", "AA", "AS", "
 
 #Cleaning-----
 
+#we can also change these to actual numbers, but we can also use dummies of same names. 
 group3 <- group3 %>%
   mutate(Company.response.to.consumer = case_when(Company.response.to.consumer == "In progress" ~ 0,
                                                   Company.response.to.consumer == "Closed with explanation" ~ 1,
                                                   Company.response.to.consumer == "Untimely response" ~ 2,
                                                   Company.response.to.consumer == "Closed with non-monetary relief" ~ 3,
                                                   Company.response.to.consumer == "Closed with monetary relief" ~ 4,
-                                                  Company.response.to.consumer == "Closed" ~ 5))
-   
-group3 <- group3 %>%
-  mutate(Sub.product = case_when(Sub.product == "Other debt" ~ "Misc. debt",
+                                                  Company.response.to.consumer == "Closed" ~ 5),
+         Sub.product = case_when(Sub.product == "Other debt" ~ "Misc. debt",
                                  Sub.product == 'Other (i.e. phone, health club, etc.)' ~ "Misc. debt",
                                  Sub.product == "Telecommunications debt" ~ "Misc. debt",
                                  Sub.product == 'I do not know' ~ "Misc. debt",
@@ -79,14 +78,8 @@ group3 <- group3 %>%
                            Issue == "Disclosure verification of debt" ~ "Improper Communication Tactic",
                            Issue == "Improper contact or sharing of info" ~ "Improper Communication Tactic",
                            Issue == "Written notification about debt" ~ "Debt Notifications",
-                           Issue == "Electronic communications"   ~ "Debt Notifications") )
-                                 
-
-
-unique(group3$Company.public.response)
-
-group3 <- group3 %>%
-  mutate(Company.public.response = case_when(Company.public.response == "Company has responded to the consumer and the CFPB and chooses not to provide a public response" ~ "No Comment",
+                           Issue == "Electronic communications"   ~ "Debt Notifications"),
+         Company.public.response = case_when(Company.public.response == "Company has responded to the consumer and the CFPB and chooses not to provide a public response" ~ "No Comment",
                                            Company.public.response == "Company chooses not to provide a public response" ~ "No Comment",
                                            Company.public.response == "Company believes complaint represents an opportunity for improvement to better serve consumers" ~ "Improve Service",
                                            Company.public.response == "Company believes the complaint provided an opportunity to answer consumer's questions" ~ "Improve Service",
@@ -98,12 +91,14 @@ group3 <- group3 %>%
                                                 Consumer.consent.provided. == "Other"  ~ "No consent provided",
                                                 Consumer.consent.provided. == "Consent withdrawn"   ~ "No consent provided",
                                                 Consumer.consent.provided. == "N/A" ~ "No consent provided",))
+unique(group3$Sub.product)
 
+#Dummy for after date (form changes NA imputation)
+group3$Dispute_prior <- ifelse(group3$Date.received  > '04/24/17', 1,0)
 
+unique(group3$Company.response.to.consumer)
 
-
-
-#Zip code cleaning 
+#Zip code cleaning -----
 
 #Get all unique zips in our dataset
 unique_zips <- unique(fips_data$ZIP)
@@ -131,9 +126,48 @@ for(i in 1:length(zip)){
 #retest leading zips if they are correct zips
 zip_binary_map_1 <- ifelse((zip) %in% USA_zippop$zipcode, T,F)
 
-table(zip_binary_map_1) # missing 179 zip codes. To save time, we are dropping these variables
+table(zip_binary_map_1) # 179 zip codes are still incorrect. To save time, we are dropping these variables
 
-#
+#recreate zips 
+
+subset(zip_binary_map_1)
+
+#data_na$entry2 <- replace(df$entry2, df$entry2 < 0, NA)
+
+replace(group3$ZIP.code, zip_binary_map_1 == T, zip)
+drop_zips <- zip[zip_binary_map_1 == F]
+
+indicies_zip <- which(zip_binary_map == F, arr.ind = TRUE)
+
+#using a loop to replace zips by indices 
+for (i in indicies_zip){
+  cell <- indicies_zip[i] 
+  replace(unique_zips[cell],   ) 
+}
+
+
+#fix here
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 ### Clustering code -----
