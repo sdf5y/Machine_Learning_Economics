@@ -22,7 +22,7 @@ library(wesanderson)
 #Loading The Data----
 
 group3 <- read.csv("group3.csv")
-group3 <- data_df[-1] #inefficient, but works
+group3 <- group3[-1] #inefficient, but works
 
 fips_data <- read.csv("zip_fips.csv")
 fips_data <- fips_data[-1]#inefficient, but works
@@ -40,12 +40,41 @@ group3$drop<- as.numeric(group3$State %in% c("NONE", "None", "DC", "AA", "AS", "
 #Cleaning-----
 unique_zips <- unique(fips_data$ZIP)
 
+unique(group3$Company.response.to.consumer)
 
+group3 <- group3 %>%
+  mutate(Company.response.to.consumer = case_when(Company.response.to.consumer == "In progress" ~ 0,
+                                                  Company.response.to.consumer == "Closed with explanation" ~ 1,
+                                                  Company.response.to.consumer == "Untimely response" ~ 2,
+                                                  Company.response.to.consumer == "Closed with non-monetary relief" ~ 3,
+                                                  Company.response.to.consumer == "Closed with monetary relief" ~ 4,
+                                                  Company.response.to.consumer == "Closed" ~ 5))
+   
+unique(group3$Product) #one category
+unique(group3$Sub.product) #19 types of sub categories of debt
 
-
-
-
-
+group3 <- group3 %>%
+  mutate(Sub.product = case_when(Sub.product == "Other debt" ~ "Misc. debt",
+                                 Sub.product == 'Other (i.e. phone, health club, etc.)' ~ "Misc. debt",
+                                 Sub.product == "Telecommunications debt" ~ "Misc. debt",
+                                 Sub.product == 'I do not know' ~ "Misc. debt",
+                                 Sub.product == "Federal student loan debt" ~ "Federal Student Loans",
+                                 Sub.product == "Federal student loan"   ~ "Federal Student Loans",
+                                 Sub.product == "Private student loan debt" ~ "Non-Federal Student Loans",
+                                 Sub.product == "Non-federal student loan"  ~ "Non-Federal Student Loans",
+                                 Sub.product == "Auto" ~ "Auto debt",
+                                 Sub.product == "Auto debt" ~ "Auto debt",
+                                 Sub.product == "Credit card debt" ~ "Credit card debt",
+                                 Sub.product == "Credit card" ~ "Credit card debt", 
+                                 Sub.product == 'Morgage debt'~ "Home debt", 
+                                 Sub.product == "Mortgage" ~ "Home debt",
+                                 Sub.product == 'Medical' ~ "Medical debt",
+                                 Sub.product == "Medical debt" ~ "Medical debt",
+                                 Sub.product == "Rental debt" ~ "Rental debt",
+                                 Sub.product == "Payday loan debt" ~ "Payday debt",
+                                 Sub.product == "Payday loan" ~ "Payday debt")) #missing one variable, lets check it later
+                                 
+unique(group3$Sub.product)                                 
 
 
 ### Clustering code -----
