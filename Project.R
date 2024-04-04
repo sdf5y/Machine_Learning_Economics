@@ -62,7 +62,7 @@ group3 <- group3 %>%
                                  Sub.product == "Auto debt" ~ "Auto debt",
                                  Sub.product == "Credit card debt" ~ "Credit card debt",
                                  Sub.product == "Credit card" ~ "Credit card debt", 
-                                 Sub.product == 'Morgage debt'~ "Home debt", 
+                                 Sub.product == 'Mortgage debt'~ "Home debt", #fixed a typo in mortgage (by Nirav). 
                                  Sub.product == "Mortgage" ~ "Home debt",
                                  Sub.product == 'Medical' ~ "Medical debt",
                                  Sub.product == "Medical debt" ~ "Medical debt",
