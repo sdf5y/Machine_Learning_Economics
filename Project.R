@@ -214,15 +214,19 @@ table(ifelse(group3$ZIP.code %in% USA_zippop$zipcode, T,F))
 
 #rm(i, zip, zip_binary_map, zip_binary_map_1, unique_zips, unclean_zips) #remove these variables when done.
 
-'''
-here is a good stab at addressing the zip code issue in our data. 
-But their are other problems. 
-The fips dataset is simple to correct because it just needs leading zeros.
-The main dataset has mismatched zips with states even before addressing other errors.
-We should consider using the clean fips dataset to match and replace states that are not a pair between their zip and state.
-Then we could impute zips for high density areas in each state for these problem selections.
+#install.packages('stringr')
+library(stringr)
+table(str_detect( as.character(group3$ZIP.code), "[0-9]+$")) #looks like they're all numbers
 
-'''
+group3$zip_err_5less <- ifelse(nchar(group3$ZIP.code) >5 , 1,0) #6 entries greater than 5 digits
+
+table(group3$zip_err_5less )
+
+group3 <- subset(group3, nchar(group3$zip_err_5less)==T) #dropping the 6 rows that 
+
+group3 <- subset(group3, group3$ZIP.code %in% USA_zippop$zipcode) #dropping zips not in usa zip codes
+
+
 
 
 
