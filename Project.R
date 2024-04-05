@@ -158,8 +158,7 @@ table(group3$zipcode_error) #2751 incorrect zip codes, 40,000 correct ones
 
 t.test(table(group3$zipcode_error), alternative = 'two.sided') #fail to reject the null - not significant at 5% level
 
-
-#Fips Zips -----
+#Fips Zips Clean -----
 unique_zips <- unique(fips_data$ZIP) #unique fips zips
 USA_zippop <- zip_code_db #unique usa zips
 
@@ -184,17 +183,19 @@ fips_data$ZIP[which(zip_binary_map == F)] <- zip
 
 table(ifelse(fips_data$ZIP %in% USA_zippop$zipcode, T,F))
 
-#Dataset zip----
+#rm(i, zip, zip_binary_map, zip_binary_map_1, unique_zips, unclean_zips) #remove these variables when done.
+
+#Main dataset zip cleaning----
 unique_zips <- unique(group3$ZIP.code)
 
 #Get all unique USA zips----
 USA_zippop <- zip_code_db
 
 #Map zips in our data not in the USA zip file
-zip_binary_map <- ifelse(unique_zips %in% USA_zippop$zipcode, T,F)
+zip_binary_map <- ifelse(group3$ZIP.code %in% USA_zippop$zipcode, T,F)
 
 #Place a leading zero for the problem zips
-zip <- as.character(fips_data$ZIP[zip_binary_map == FALSE])
+zip <- as.character(group3$ZIP.code[zip_binary_map == FALSE])
 for(i in 1:length(zip)){
   if(as.numeric(zip[i]) < 10000){
     zip[i] <- paste0("0", zip[i])
@@ -203,13 +204,13 @@ for(i in 1:length(zip)){
 
 #retest leading zips if they are correct zips
 
-table(ifelse(zip %in% USA_zippop$zipcode, T,F)) # 158 zip codes are still incorrect. To save time, we are dropping these variables
+table(ifelse(zip %in% USA_zippop$zipcode, T,F)) # None have leading zero issues. Use another method
 
-#recreate zips indata
+#insert zips in data
 
 group3$ZIP.code[which(zip_binary_map == F)] <- zip
 
-table(ifelse(fips_data$ZIP %in% USA_zippop$zipcode, T,F))
+table(ifelse(group3$ZIP.code %in% USA_zippop$zipcode, T,F))
 
 #rm(i, zip, zip_binary_map, zip_binary_map_1, unique_zips, unclean_zips) #remove these variables when done.
 
