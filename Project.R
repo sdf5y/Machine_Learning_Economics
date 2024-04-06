@@ -279,16 +279,41 @@ for (fip in unique_fips) {
 
 combined_results2 <- bind_rows(results_list2, .id = "Pop_over64")
 
-temp <- cbind(bind_rows(results_list, .id = "Pop_less25"), bind_rows(results_list2, .id = "Pop_over64"))
+#Ethnicity 
+colnames(county_totals)
 
-colnames(temp) <- c("Fips", "Pop_less25", "Fips", "Pop_over64")
+results_list3 <- list()
+i <- 1
+for (i in 1:nrow(county_totals)){
+  result <- sum(county_totals$H_FEMALE[i], county_totals$H_MALE[i])
+  results_list3[[i]] <- result
+}
+
+combined_results3 <- data.frame('Pop_Hispanic' = unlist(results_list3))
+
+temp <- cbind(bind_rows(results_list, .id = "Pop_less25"), bind_rows(results_list2, .id = "Pop_over64"), combined_results3)
+
+colnames(temp) <- c("Fips", "Pop_less25", "Fips", "Pop_over64", "Pop_Hispanic")
 temp <- temp[,-3]
 
-#Loop Gender ----
+county_totals <- subset(census, (AGEGRP == 0 & YEAR == 1))
+
+#combo_demographies <- merge(county_totals, temp, by.x = 'census_fips', by.y = 'Fips')
+
+#older Americans and servicefolk
+group3$servicemenber <- ifelse(str_detect(group3$Tags, "Servicemember"), 1, 0)
+group3$olderAm <- ifelse(str_detect(group3$Tags, "Older American"), 1, 0)
 
 
 
 #data_census <- merge(merg_fips, census, by.x = 'STCOUNTYFP', by.y = "census_fips")
+
+
+
+
+
+
+
 
 #PCA prep Split Dataset by Male/Female ----
 indx <- grepl('_FEMALE', colnames(census))
