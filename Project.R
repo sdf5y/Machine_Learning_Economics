@@ -252,7 +252,26 @@ census_fips <- (paste(census$STATE, census$COUNTY, sep = ""))
 
 census <- cbind(census, census_fips)
 
-data_cenus <- merge(merg_fips, census, by = c('STCOUNTYFP' = "census_fips"))
+data_cenus <- merge(merg_fips, census, by.x = 'STCOUNTYFP', by.y = "census_fips")
+
+#Split Dataset by Male/Female ----
+indx <- grepl('_FEMALE', colnames(data_cenus))
+
+female_df <- data_cenus[indx]
+
+rm(indx)
+
+indx <- grepl('_MALE', colnames(data_cenus))
+
+male_df <- data_cenus[indx]
+colnames(male_df)
+
+
+#now we run PCA for each male/female dataset to determine ethnicity/race
+
+
+
+
 
 ### Clustering code -----
 # make a separate dataset, and then make sure each variable is the right class. 
