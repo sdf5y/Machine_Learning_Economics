@@ -31,8 +31,6 @@ fips_data <- fips_data[-1]#inefficient, but works
 
 countydebt <- read_excel("dia_lbls_all_overall_county_2022_02_14Sep2023.xlsx")
 
-colnames(countydebt)
-
 census <- read_csv("cc-est2022-all.csv")
 
 #Isolating the Dependent Variable-----
@@ -223,7 +221,7 @@ group3$ZIP.code[which(zip_binary_map == F)] <- zip
 
 table(ifelse(group3$ZIP.code %in% USA_zippop$zipcode, T,F))
 
-#rm(i, zip, zip_binary_map, zip_binary_map_1, unique_zips, unclean_zips) #remove these variables when done.
+rm(i, zip, zip_binary_map, zip_binary_map_1, unique_zips, unclean_zips) #remove these variables when done.
 
 #install.packages('stringr')
 library(stringr)
@@ -252,24 +250,71 @@ census_fips <- (paste(census$STATE, census$COUNTY, sep = ""))
 
 census <- cbind(census, census_fips)
 
-data_cenus <- merge(merg_fips, census, by.x = 'STCOUNTYFP', by.y = "census_fips")
+data_census <- merge(merg_fips, census, by.x = 'STCOUNTYFP', by.y = "census_fips")
 
-#Split Dataset by Male/Female ----
-indx <- grepl('_FEMALE', colnames(data_cenus))
+#PCA prep Split Dataset by Male/Female ----
+indx <- grepl('_FEMALE', colnames(data_census))
 
-female_df <- data_cenus[indx]
+female_df <- data_census[indx]
 
 rm(indx)
 
-indx <- grepl('_MALE', colnames(data_cenus))
+indx <- grepl('_MALE', colnames(data_census))
 
-male_df <- data_cenus[indx]
+male_df <- data_census[indx]
 colnames(male_df)
-
 
 #now we run PCA for each male/female dataset to determine ethnicity/race
 
+#Male PCA
 
+x_stan <- scale(male_df[,-c(1)])
+y_stan <- scale(male_df[, 1])
+
+male_re <- prcomp(x_stan)
+
+variance_explained <- male_re$sd^2/sum(male_re$sd^2)*100 
+variance_explained[1:which.max(variance_explained >= 0.9)] 
+
+qplot(c(1:length(variance_explained)) , variance_explained) + 
+  geom_line() + 
+  xlab("Principal Component") + 
+  ylab("Variance Explained") +
+  ggtitle("Scree Plot of Males Ethnicities") +
+  ylim(0, 100) 
+
+#install.packages('pls')
+library(pls)
+
+pls_model <- plsr(y_stan ~ ., data = as.data.frame(x_stan), ncomp = 12)  
+summary(pls_model) #99.92 of the variance explained with 4 comps
+
+rm(x_stan, y_stan, variance_explained, pls_model, male_re)
+
+#female PCA
+
+x_stan <- scale(female_df[,-c(1)])
+y_stan <- scale(female_df[, 1])
+
+female_re <- prcomp(x_stan)
+
+variance_explained <- female_re$sd^2/sum(female_re$sd^2)*100 
+variance_explained[1:which.max(variance_explained >= 0.9)] 
+
+qplot(c(1:length(variance_explained)) , variance_explained) + 
+  geom_line() + 
+  xlab("Principal Component") + 
+  ylab("Variance Explained") +
+  ggtitle("Scree Plot of Females Ethnicities") +
+  ylim(0, 100) 
+
+#install.packages('pls')
+library(pls)
+
+pls_model <- plsr(y_stan ~ ., data = as.data.frame(x_stan), ncomp = 12)  
+summary(pls_model) #99.93 of the variance explained with 4 comps
+
+rm(x_stan, y_stan, variance_explained, pls_model, female_re)
 
 
 
