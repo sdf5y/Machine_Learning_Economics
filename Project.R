@@ -250,21 +250,59 @@ census_fips <- (paste(census$STATE, census$COUNTY, sep = ""))
 
 census <- cbind(census, census_fips)
 
-data_census <- merge(merg_fips, census, by.x = 'STCOUNTYFP', by.y = "census_fips")
+#Age dummies----
+
+unique_fips <- unique(census$census_fips)
+results_list <- list()
+
+for (fip in unique_fips) {
+  result <- census %>%
+    filter(census_fips == fip, YEAR == 1, AGEGRP >= 1 & AGEGRP <= 5) %>%
+    summarise(TOTAL_POP = sum(TOT_POP))
+  
+  results_list[[fip]] <- result
+}
+
+combined_results <- bind_rows(results_list, .id = "Pop_less25")
+
+#run for over 65
+
+results_list2 <- list()
+fip <- 0
+for (fip in unique_fips) {
+  result <- census %>%
+    filter(census_fips == fip, YEAR == 1, AGEGRP >= 13 & AGEGRP <= 18) %>%
+    summarise(TOTAL_POP = sum(TOT_POP))
+  
+  results_list2[[fip]] <- result
+}
+
+combined_results2 <- bind_rows(results_list2, .id = "Pop_over64")
+
+temp <- cbind(bind_rows(results_list, .id = "Pop_less25"), bind_rows(results_list2, .id = "Pop_over64"))
+
+colnames(temp) <- c("Fips", "Pop_less25", "Fips", "Pop_over64")
+temp <- temp[,-3]
+
+#Loop Gender ----
+
+
+
+#data_census <- merge(merg_fips, census, by.x = 'STCOUNTYFP', by.y = "census_fips")
 
 #PCA prep Split Dataset by Male/Female ----
-indx <- grepl('_FEMALE', colnames(data_census))
+indx <- grepl('_FEMALE', colnames(census))
 
-female_df <- data_census[indx]
+female_df <- census[indx]
 
 rm(indx)
 
-indx <- grepl('_MALE', colnames(data_census))
+indx <- grepl('_MALE', colnames(census))
 
-male_df <- data_census[indx]
+male_df <- census[indx]
 colnames(male_df)
 
-#now we run PCA for each male/female dataset to determine ethnicity/race
+#now we run PCA for each male/female dataset to determine ethnicity/race----
 
 #Male PCA
 
@@ -289,7 +327,54 @@ library(pls)
 pls_model <- plsr(y_stan ~ ., data = as.data.frame(x_stan), ncomp = 12)  
 summary(pls_model) #99.92 of the variance explained with 4 comps
 
-rm(x_stan, y_stan, variance_explained, pls_model, male_re)
+pls_model$loadings[, 1:5]
+
+#rm(x_stan, y_stan, variance_explained, pls_model, male_re)
+
+
+
+library(ggcorrplot)
+library("FactoMineR")
+# PCA is based on correlations, not distance.
+## So we need to store the correlation matrix.
+corr_matrix <- cor(male_df[,-1])
+ggcorrplot(corr_matrix)
+
+## do PCA
+male_eth_race.pca <- princomp(corr_matrix)
+summary(male_eth_race.pca)
+fviz_eig(male_eth_race.pca, addlabels = TRUE)
+
+# loadings for first 5 components
+male_eth_race.pca$loadings[, 1:5]                       
+
+#scree plot
+variance_explained <- male_eth_race.pca $sd^2/sum(male_eth_race.pca$sd^2)*100 
+variance_explained[1:8] 
+qplot(c(1:8), variance_explained[1:8]) + 
+  geom_line() + 
+  xlab("Principal Component") + 
+  ylab("Variance Explained") +
+  ggtitle("Scree Plot") +
+  ylim(0, 100) 
+
+qplot(c(1:length(variance_explained[1:8])) , variance_explained[1:8]) + 
+  geom_line() + 
+  xlab("Principal Component") + 
+  ylab("Variance Explained") +
+  ggtitle("Scree Plot of Males Ethnicities") +
+  ylim(0, 100)
+
+
+
+
+
+
+
+
+
+
+
 
 #female PCA
 
@@ -314,7 +399,10 @@ library(pls)
 pls_model <- plsr(y_stan ~ ., data = as.data.frame(x_stan), ncomp = 12)  
 summary(pls_model) #99.93 of the variance explained with 4 comps
 
+pls_model$loadings[, 1:5]
+
 rm(x_stan, y_stan, variance_explained, pls_model, female_re)
+
 
 
 
