@@ -29,6 +29,12 @@ group3 <- group3[-1] #inefficient, but works
 fips_data <- read_csv("zip_fips.csv")
 fips_data <- fips_data[-1]#inefficient, but works
 
+countydebt <- read_excel("dia_lbls_all_overall_county_2022_02_14Sep2023.xlsx")
+
+colnames(countydebt)
+
+census <- read_csv("cc-est2022-all.csv")
+
 #Isolating the Dependent Variable-----
 
 group3$relief<- ifelse(group3$Company.response.to.consumer %in% c("Closed with monetary relief", 
@@ -41,6 +47,11 @@ group3$relief<- ifelse(group3$Company.response.to.consumer %in% c("Closed with m
 #drop non states 
 group3$drop<- as.numeric(group3$State %in% c("NONE", "None", "DC", "AA", "AS", "FM","GU", "MH", "MP", "PR", "VI", "UNITED STATES MINOR OUTLYING ISLANDS"))
 fips_data <- fips_data[!fips_data$STATE %in% c("NONE", "None", "DC", "AA", "AS", "FM","GU", "MH", "MP", "PR", "VI", "UNITED STATES MINOR OUTLYING ISLANDS"),]
+
+countydebt <- countydebt[,-c(4, 7, 10, 13, 16, 19, 22, 26)]
+
+countydebt$`County FIPS` <- as.numeric(countydebt$`County FIPS`)
+
 
 #Named Factors ----
 group3 <- group3 %>%
@@ -226,20 +237,22 @@ group3 <- subset(group3, nchar(group3$zip_err_5less)==T) #dropping the 6 rows th
 
 group3 <- subset(group3, group3$ZIP.code %in% USA_zippop$zipcode) #dropping zips not in usa zip codes
 
+#Q3 ----
 
+#merge 
+merg_zips <- merge(group3, fips_data, by.x =  'ZIP.code', by.y = 'ZIP')
 
+#Q4 -----
 
+merg_fips <- merge(merg_zips, countydebt,  by.x = 'STCOUNTYFP', by.y = 'County FIPS') #by = c('STCOUNTYFP' =  'County FIPS')) 
 
+#Q5----
 
+census_fips <- (paste(census$STATE, census$COUNTY, sep = ""))
 
+census <- cbind(census, census_fips)
 
-
-
-
-
-
-
-
+data_cenus <- merge(merg_fips, census, by = c('STCOUNTYFP' = "census_fips"))
 
 ### Clustering code -----
 # make a separate dataset, and then make sure each variable is the right class. 
