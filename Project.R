@@ -280,6 +280,8 @@ for (fip in unique_fips) {
 combined_results2 <- bind_rows(results_list2, .id = "Pop_over64")
 
 #Ethnicity 
+
+county_totals <- subset(census, (AGEGRP == 0 & YEAR == 1))
 colnames(county_totals)
 
 results_list3 <- list()
@@ -291,12 +293,12 @@ for (i in 1:nrow(county_totals)){
 
 combined_results3 <- data.frame('Pop_Hispanic' = unlist(results_list3))
 
-temp <- cbind(bind_rows(results_list, .id = "Pop_less25"), bind_rows(results_list2, .id = "Pop_over64"), combined_results3)
+county_demos <- cbind(bind_rows(results_list, .id = "Pop_less25"), bind_rows(results_list2, .id = "Pop_over64"), combined_results3)
 
-colnames(temp) <- c("Fips", "Pop_less25", "Fips", "Pop_over64", "Pop_Hispanic")
-temp <- temp[,-3]
+colnames(county_demos) <- c("Fips", "Pop_less25", "Fips", "Pop_over64", "Pop_Hispanic")
+county_demos <- county_demos[,-3]
 
-county_totals <- subset(census, (AGEGRP == 0 & YEAR == 1))
+
 
 #combo_demographies <- merge(county_totals, temp, by.x = 'census_fips', by.y = 'Fips')
 
@@ -304,7 +306,11 @@ county_totals <- subset(census, (AGEGRP == 0 & YEAR == 1))
 group3$servicemenber <- ifelse(str_detect(group3$Tags, "Servicemember"), 1, 0)
 group3$olderAm <- ifelse(str_detect(group3$Tags, "Older American"), 1, 0)
 
-
+#making csvs to save time in cleanup -----
+#write.csv(group3, "cleangroup3.csv")
+#write.csv(county_demos, "county_demos.csv")
+#write.csv(census, "cleancensus.csv")
+#write.csv(merg_fips, 'merg_fips.csv')
 
 #data_census <- merge(merg_fips, census, by.x = 'STCOUNTYFP', by.y = "census_fips")
 
