@@ -20,7 +20,9 @@ library(clustMixType)
 library(wesanderson)
 #install.packages("zipcodeR")
 library(zipcodeR)
-
+install.packages("formattable")
+install.packages("wesanderson")
+install.packages("clustMixType")
 #Loading The Data----
 
 group3 <- read_csv("group3.csv")
@@ -359,6 +361,9 @@ for (fip in unique_fips) {
   results_list4[[fip]] <- result
 }
 
+combined_results4 <- do.call(rbind, results_list4)
+
+county_demos <- cbind(county_demos, combined_results4)
 
 races_all %>%
   mutate_at(vars(w_sum, b_sum, a_sum, combo_native), as.numeric) %>%
