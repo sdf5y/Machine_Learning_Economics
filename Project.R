@@ -250,7 +250,16 @@ census_fips <- (paste(census$STATE, census$COUNTY, sep = ""))
 
 census <- cbind(census, census_fips)
 
-#Age dummies----
+#Prep Split Dataset by Male/Female ----
+indx <- grepl('_FEMALE', colnames(census))
+female_df <- census[indx]
+rm(indx)
+
+indx <- grepl('_MALE', colnames(census))
+male_df <- census[indx]
+colnames(male_df)
+
+#Age dummies
 
 unique_fips <- unique(census$census_fips)
 results_list <- list()
@@ -298,13 +307,66 @@ county_demos <- cbind(bind_rows(results_list, .id = "Pop_less25"), bind_rows(res
 colnames(county_demos) <- c("Fips", "Pop_less25", "Fips", "Pop_over64", "Pop_Hispanic")
 county_demos <- county_demos[,-3]
 
-
-
 #combo_demographies <- merge(county_totals, temp, by.x = 'census_fips', by.y = 'Fips')
 
 #older Americans and servicefolk
 group3$servicemenber <- ifelse(str_detect(group3$Tags, "Servicemember"), 1, 0)
 group3$olderAm <- ifelse(str_detect(group3$Tags, "Older American"), 1, 0)
+
+#Race counts per county
+
+#whites
+indx <- grepl('WA', colnames(census))
+whites_df <- census[indx]
+w_sum <- rowSums(whites_df)
+
+#Blacks
+indx <- grepl('BA', colnames(census))
+black_df <- census[indx]
+b_sum <- rowSums(black_df)
+
+#Asian
+indx <- grepl('AA', colnames(census))
+asian_df <- census[indx]
+a_sum <- rowSums(asian_df)
+
+#Native Americans
+indx <- grepl('IA', colnames(census))
+indx2 <- grepl('NA', colnames(census))
+native_df <- census[indx]
+native2_df <- census[indx2]
+native2_df <- native2_df[,-c(1,2)]
+n_sum <- rowSums(native_df)
+nsum2 <- rowSums(native2_df)
+
+combo_native <- n_sum + nsum2
+
+#including them into demographic df
+races_all <- cbind(census_fips, w_sum, b_sum, a_sum, combo_native)
+races_all <- as.data.frame(races_all) 
+
+results_list4 <- list()
+
+for (fip in unique_fips) {
+  result <- races_all %>%
+    mutate_at(vars(w_sum, b_sum, a_sum, combo_native), as.numeric) %>%
+    filter(census_fips == fip) %>%
+    summarise(w_total = sum(w_sum),  
+              b_total = sum(b_sum),
+              a_total = sum(a_sum),
+              combo_native_total = sum(combo_native))
+  
+  results_list4[[fip]] <- result
+}
+
+
+races_all %>%
+  mutate_at(vars(w_sum, b_sum, a_sum, combo_native), as.numeric) %>%
+  group_by(census_fips) %>%
+  summarise(w_total = sum(w_sum),  
+            b_total = sum(b_sum),
+            a_total = sum(a_sum),
+            combo_native_total = sum(combo_native))
 
 #making csvs to save time in cleanup -----
 #write.csv(group3, "cleangroup3.csv")
@@ -315,32 +377,40 @@ group3$olderAm <- ifelse(str_detect(group3$Tags, "Older American"), 1, 0)
 #data_census <- merge(merg_fips, census, by.x = 'STCOUNTYFP', by.y = "census_fips")
 
 
+### cluster analysis
+# must normalize data
+
+z <- male_df[,-c(1,25)]
+means <- apply(z,2,mean)
+sds <- apply(z,2,sd)
+nor <- scale(z,center=means,scale=sds)
+distance = dist(nor)
+
+library(factoextra)
+## 4 clusters for 4 race groups
+male_km <- kmeans(nor, 4, nstart = 79)
+print(male_km)
+fviz_cluster(male_km, data = nor,
+             palette = c("#2E9FDF", "#00AFBB", "#E7B800", "pink"),
+             geom = "point",
+             ellipse.type = "convex",ggtheme = theme_bw()
+)
+
+male_clusters <- male_km$cluster
+temp <- male_df[male_clusters==4,]
+
+print(temp)
+
+student.hclust = hclust(distance, method = 'average')
+print(student.hclust)
+plot(student.hclust, label=FALSE, main='Default from hclust for Student data')
+
+## Choose the number of clusters and get the groupings
+student_cut <- cutree(student.hclust, k = 5)
+table(student_cut)
 
 
 
-
-
-
-#PCA prep Split Dataset by Male/Female ----
-indx <- grepl('_FEMALE', colnames(census))
-
-female_df <- census[indx]
-
-rm(indx)
-
-indx <- grepl('_MALE', colnames(census))
-
-male_df <- census[indx]
-colnames(male_df)
-
-#now we run PCA for each male/female dataset to determine ethnicity/race----
-
-#Male PCA
-
-x_stan <- scale(male_df[,-c(1)])
-y_stan <- scale(male_df[, 1])
-
-male_re <- prcomp(x_stan)
 
 variance_explained <- male_re$sd^2/sum(male_re$sd^2)*100 
 variance_explained[1:which.max(variance_explained >= 0.9)] 
@@ -368,7 +438,7 @@ library(ggcorrplot)
 library("FactoMineR")
 # PCA is based on correlations, not distance.
 ## So we need to store the correlation matrix.
-corr_matrix <- cor(male_df[,-1])
+corr_matrix <- cor(male_df[,-c(1, 25)])
 ggcorrplot(corr_matrix)
 
 ## do PCA
@@ -377,7 +447,12 @@ summary(male_eth_race.pca)
 fviz_eig(male_eth_race.pca, addlabels = TRUE)
 
 # loadings for first 5 components
-male_eth_race.pca$loadings[, 1:5]                       
+loadings_m <- male_eth_race.pca$loadings[, 1:5]
+loadings_m
+eigenvalues <- male_eth_race.pca$sdev^2
+
+loadings_original_scale <- loadings_m[, 1:5] * sqrt(eigenvalues)
+
 
 #scree plot
 variance_explained <- male_eth_race.pca $sd^2/sum(male_eth_race.pca$sd^2)*100 
