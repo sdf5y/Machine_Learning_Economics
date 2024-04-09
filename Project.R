@@ -20,9 +20,7 @@ library(clustMixType)
 library(wesanderson)
 #install.packages("zipcodeR")
 library(zipcodeR)
-install.packages("formattable")
-install.packages("wesanderson")
-install.packages("clustMixType")
+
 #Loading The Data----
 
 group3 <- read_csv("group3.csv")
@@ -365,13 +363,14 @@ combined_results4 <- do.call(rbind, results_list4)
 
 county_demos <- cbind(county_demos, combined_results4)
 
-races_all %>%
-  mutate_at(vars(w_sum, b_sum, a_sum, combo_native), as.numeric) %>%
-  group_by(census_fips) %>%
-  summarise(w_total = sum(w_sum),  
-            b_total = sum(b_sum),
-            a_total = sum(a_sum),
-            combo_native_total = sum(combo_native))
+#Q6-----
+
+#matching fips to zips
+
+merg_county_demos <- merge(county_demos, fips_data, by.x = 'Fips', by.y = "STCOUNTYFP")
+clean_group3 <- left_join(group3, merg_county_demos, by = c('ZIP.code' = 'ZIP'))
+
+#Q7------
 
 #making csvs to save time in cleanup -----
 #write.csv(group3, "cleangroup3.csv")
