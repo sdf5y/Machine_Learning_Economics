@@ -368,7 +368,7 @@ clean_group3 <- left_join(group3, merg_county_demos, by = c('ZIP.code' = 'ZIP'))
 
 data_census <- merge(merg_fips, census, by.x = 'STCOUNTYFP', by.y = "census_fips")
 
-
+write.csv(data_census, "final_group3.csv")
 
 
 
