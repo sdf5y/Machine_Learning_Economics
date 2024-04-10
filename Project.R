@@ -20,6 +20,7 @@ library(clustMixType)
 library(wesanderson)
 #install.packages("zipcodeR")
 library(zipcodeR)
+library(stringr)
 
 #Loading The Data----
 
@@ -160,14 +161,8 @@ unique(group3$Company.response.to.consumer)
 
 #Zip Code Cleaning -----
 
-#Evaluate the number of incorrect zip codes ----
-group3$zipcode_error <- ifelse(group3$ZIP.code < 10000, 0,1) #assuming less than 4 digits as incorrect
-
-table(group3$zipcode_error) #2751 incorrect zip codes, 40,000 correct ones
-
-t.test(table(group3$zipcode_error), alternative = 'two.sided') #fail to reject the null - not significant at 5% level
-
-#Fips Zips Clean -----
+#Evaluate the number of incorrect zip codes
+#Fips Zips Clean 
 unique_zips <- unique(fips_data$ZIP) #unique fips zips
 USA_zippop <- zip_code_db #unique usa zips
 
@@ -183,21 +178,19 @@ for(i in 1:length(zip)){
 }
 
 #retest leading zips if they are correct zips
-
 table(ifelse(zip %in% USA_zippop$zipcode, T,F)) # 2 zip codes are still incorrect. To save time, we are dropping these variables
 
 #recreate zips in fips data
-
 fips_data$ZIP[which(zip_binary_map == F)] <- zip
 
 table(ifelse(fips_data$ZIP %in% USA_zippop$zipcode, T,F))
 
 #rm(i, zip, zip_binary_map, zip_binary_map_1, unique_zips, unclean_zips) #remove these variables when done.
 
-#Main dataset zip cleaning----
+#Main dataset zip cleaning
 unique_zips <- unique(group3$ZIP.code)
 
-#Get all unique USA zips----
+#Get all unique USA zips
 USA_zippop <- zip_code_db
 
 #Map zips in our data not in the USA zip file
@@ -224,7 +217,7 @@ table(ifelse(group3$ZIP.code %in% USA_zippop$zipcode, T,F))
 rm(i, zip, zip_binary_map, zip_binary_map_1, unique_zips, unclean_zips) #remove these variables when done.
 
 #install.packages('stringr')
-library(stringr)
+
 table(str_detect( as.character(group3$ZIP.code), "[0-9]+$")) #looks like they're all numbers
 
 group3$zip_err_5less <- ifelse(nchar(group3$ZIP.code) >5 , 1,0) #6 entries greater than 5 digits
@@ -263,6 +256,8 @@ colnames(male_df)
 
 unique_fips <- unique(census$census_fips)
 results_list <- list()
+results_list2 <- list()
+fip <- 0
 
 for (fip in unique_fips) {
   result <- census %>%
@@ -270,22 +265,15 @@ for (fip in unique_fips) {
     summarise(TOTAL_POP = sum(TOT_POP))
   
   results_list[[fip]] <- result
-}
-
-combined_results <- bind_rows(results_list, .id = "Pop_less25")
-
-#run for over 65
-
-results_list2 <- list()
-fip <- 0
-for (fip in unique_fips) {
-  result <- census %>%
+  
+  result2 <- census %>%
     filter(census_fips == fip, YEAR == 1, AGEGRP >= 13 & AGEGRP <= 18) %>%
     summarise(TOTAL_POP = sum(TOT_POP))
   
-  results_list2[[fip]] <- result
+  results_list2[[fip]] <- result2
 }
 
+combined_results <- bind_rows(results_list, .id = "Pop_less25")
 combined_results2 <- bind_rows(results_list2, .id = "Pop_over64")
 
 #Ethnicity 
@@ -378,7 +366,10 @@ clean_group3 <- left_join(group3, merg_county_demos, by = c('ZIP.code' = 'ZIP'))
 #write.csv(census, "cleancensus.csv")
 #write.csv(merg_fips, 'merg_fips.csv')
 
-#data_census <- merge(merg_fips, census, by.x = 'STCOUNTYFP', by.y = "census_fips")
+data_census <- merge(merg_fips, census, by.x = 'STCOUNTYFP', by.y = "census_fips")
+
+
+
 
 
 ### cluster analysis
