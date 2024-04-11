@@ -117,13 +117,13 @@ table(str_detect( as.character(group3$ZIP.code), "[0-9]+$")) #looks like they're
 table(nchar(group3$ZIP.code) >5) #No entries greater than 5 digits
 
 #Check leading zeros
-table(grepl("^0", group3$ZIP.code)) #looks like there are already leading zeros
+table(grepl("^0", group3$ZIP.code)) #looks like they already have leading zeros
 
 unique_zips <- unique(group3$ZIP.code)
 
 zip_binary_map <- unique_zips %in% fips_data$ZIP
 
-error_zips <- unique_zips[!zip_binary_map]
+error_zips <- unique_zips[!zip_binary_map] #82 erroneous zips
 
 #replace military states with nearest, largest port state
 group3$State <- replace(group3$State, group3$State %in% c('AE', 'AP'), c('NY', 'CA'))
