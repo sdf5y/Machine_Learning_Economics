@@ -20,6 +20,7 @@ library(clustMixType)
 library(wesanderson)
 #install.packages("zipcodeR")
 library(zipcodeR)
+#install.packages('stringr')
 library(stringr)
 
 #Loading The Data----
@@ -44,13 +45,12 @@ group3$relief<- ifelse(group3$Company.response.to.consumer %in% c("Closed with m
 #Cleaning-----
 
 #drop non states 
-group3$drop<- as.numeric(group3$State %in% c("NONE", "None", "DC", "AA", "AS", "FM","GU", "MH", "MP", "PR", "VI", "UNITED STATES MINOR OUTLYING ISLANDS"))
-fips_data <- fips_data[!fips_data$STATE %in% c("NONE", "None", "DC", "AA", "AS", "FM","GU", "MH", "MP", "PR", "VI", "UNITED STATES MINOR OUTLYING ISLANDS"),]
+group3$drop<- as.numeric(group3$State %in% c("NONE", "None", "DC", "AA", "AS", "AP", "AE", "FM","GU", "MH", "MP", "PR", "VI", "UNITED STATES MINOR OUTLYING ISLANDS"))
+fips_data <- fips_data[!fips_data$STATE %in% c("NONE", "None", "DC", "AA", "AS", 'AP', "AE", "FM","GU", "MH", "MP", "PR", "VI", "UNITED STATES MINOR OUTLYING ISLANDS"),]
 
 countydebt <- countydebt[,-c(4, 7, 10, 13, 16, 19, 22, 26)]
 
 countydebt$`County FIPS` <- as.numeric(countydebt$`County FIPS`)
-
 
 #Named Factors ----
 group3 <- group3 %>%
@@ -103,57 +103,6 @@ group3 <- group3 %>%
                                                 Consumer.consent.provided. == "Consent withdrawn"   ~ "No consent provided",
                                                 Consumer.consent.provided. == "N/A" ~ "No consent provided"))
 
-#Numbered Factors ----
-group3 <- group3 %>%
-  mutate(Company.response.to.consumer = case_when(Company.response.to.consumer == "In progress" ~ 0,
-                                                  Company.response.to.consumer == "Closed with explanation" ~ 1,
-                                                  Company.response.to.consumer == "Untimely response" ~ 2,
-                                                  Company.response.to.consumer == "Closed with non-monetary relief" ~ 3,
-                                                  Company.response.to.consumer == "Closed with monetary relief" ~ 4,
-                                                  Company.response.to.consumer == "Closed" ~ 5),
-         Sub.product = case_when(Sub.product == "Other debt" ~ 0,
-                                 Sub.product == 'Other (i.e. phone, health club, etc.)' ~ 0,
-                                 Sub.product == "Telecommunications debt" ~ 0,
-                                 Sub.product == 'I do not know' ~ 0,
-                                 Sub.product == "Federal student loan debt" ~ 1,
-                                 Sub.product == "Federal student loan"   ~ 1,
-                                 Sub.product == "Private student loan debt" ~ 2,
-                                 Sub.product == "Non-federal student loan"  ~ 2,
-                                 Sub.product == "Auto" ~ 3,
-                                 Sub.product == "Auto debt" ~ 3,
-                                 Sub.product == "Credit card debt" ~ 4,
-                                 Sub.product == "Credit card" ~ 4, 
-                                 Sub.product == 'Morgage debt'~ 5, 
-                                 Sub.product == "Mortgage" ~ 5,
-                                 Sub.product == 'Medical' ~ 6,
-                                 Sub.product == "Medical debt" ~ 6,
-                                 Sub.product == "Rental debt" ~ 7,
-                                 Sub.product == "Payday loan debt" ~ 8,
-                                 Sub.product == "Payday loan" ~ 8),
-         Issue = case_when(Issue == "Attempts to collect debt not owed" ~ 0,
-                           Issue == 'Cont\'d attempts collect debt not owed' ~ 0,
-                           Issue == "Took or threatened to take negative or legal action" ~ 1,
-                           Issue == 'Taking/threatening an illegal action' ~ 1,
-                           Issue == "Threatened to contact someone or share information improperly" ~ 2,
-                           Issue == "Communication tactics" ~ 2,
-                           Issue == "False statements or representation" ~ 2,
-                           Issue == "Disclosure verification of debt" ~ 2,
-                           Issue == "Improper contact or sharing of info" ~ 2,
-                           Issue == "Written notification about debt" ~ 3,
-                           Issue == "Electronic communications"   ~ 3),
-         Company.public.response = case_when(Company.public.response == "Company has responded to the consumer and the CFPB and chooses not to provide a public response" ~ 0,
-                                             Company.public.response == "Company chooses not to provide a public response" ~ 0,
-                                             Company.public.response == "Company believes complaint represents an opportunity for improvement to better serve consumers" ~ 1,
-                                             Company.public.response == "Company believes the complaint provided an opportunity to answer consumer's questions" ~ 1,
-                                             Company.public.response == "Company believes the complaint is the result of a misunderstanding" ~ 2,
-                                             Company.public.response == "Company believes complaint is the result of an isolated error" ~ 2),
-         Consumer.consent.provided. = case_when(Consumer.consent.provided. == "Consent provided" ~ 1,
-                                                Consumer.consent.provided. == "None"  ~ 0,
-                                                Consumer.consent.provided. == "Consent not provided"  ~ 0,
-                                                Consumer.consent.provided. == "Other"  ~ 0,
-                                                Consumer.consent.provided. == "Consent withdrawn"   ~ 0,
-                                                Consumer.consent.provided. == "N/A" ~ 0))
-
 #Dummy for after date (form changes NA imputation)
 group3$Dispute_prior <- ifelse(group3$Date.received  > '04/24/17', 1,0)
 
@@ -161,72 +110,50 @@ unique(group3$Company.response.to.consumer)
 
 #Zip Code Cleaning -----
 
-#Evaluate the number of incorrect zip codes
-#Fips Zips Clean 
-unique_zips <- unique(fips_data$ZIP) #unique fips zips
-USA_zippop <- zip_code_db #unique usa zips
+#check zips including numbers
+table(str_detect( as.character(group3$ZIP.code), "[0-9]+$")) #looks like they're all numbers
 
-#Map zips in our data not in the USA zip file
-zip_binary_map <- ifelse(unique_zips %in% USA_zippop$zipcode, T,F)
+#check zips less than 5 characters
+table(nchar(group3$ZIP.code) >5) #No entries greater than 5 digits
 
-#Place a leading zero for the problem zips
-zip <- as.character(fips_data$ZIP[zip_binary_map == FALSE])
-for(i in 1:length(zip)){
-  if(as.numeric(zip[i]) < 10000){
-    zip[i] <- paste0("0", zip[i])
-  }
-}
+#Check leading zeros
+table(grepl("^0", group3$ZIP.code)) #looks like there are already leading zeros
 
-#retest leading zips if they are correct zips
-table(ifelse(zip %in% USA_zippop$zipcode, T,F)) # 2 zip codes are still incorrect. To save time, we are dropping these variables
-
-#recreate zips in fips data
-fips_data$ZIP[which(zip_binary_map == F)] <- zip
-
-table(ifelse(fips_data$ZIP %in% USA_zippop$zipcode, T,F))
-
-#rm(i, zip, zip_binary_map, zip_binary_map_1, unique_zips, unclean_zips) #remove these variables when done.
-
-#Main dataset zip cleaning
 unique_zips <- unique(group3$ZIP.code)
 
-#Get all unique USA zips
-USA_zippop <- zip_code_db
+zip_binary_map <- unique_zips %in% fips_data$ZIP
 
-#Map zips in our data not in the USA zip file
-zip_binary_map <- ifelse(group3$ZIP.code %in% USA_zippop$zipcode, T,F)
+error_zips <- unique_zips[!zip_binary_map]
 
+#replace military states with nearest, largest port state
+group3$State <- replace(group3$State, group3$State %in% c('AE', 'AP'), c('NY', 'CA'))
+
+for (error_state in unique(group3$State[group3$ZIP.code %in% error_zips])) {
+  mode_zip <- names(sort(table(group3$ZIP.code[group3$State == error_state]), decreasing = TRUE)[1])
+  group3$ZIP.code[group3$ZIP.code %in% error_zips & group3$State == error_state] <- mode_zip
+}
+
+#Check if this worked
+unique_zips <- unique(group3$ZIP.code)
+zip_binary_map <- unique_zips %in% fips_data$ZIP
+table(zip_binary_map) #looks like there are no issues anymore 
+
+'''
+#LEADING Zero Code replacement if we need it later
 #Place a leading zero for the problem zips
 zip <- as.character(group3$ZIP.code[zip_binary_map == FALSE])
 for(i in 1:length(zip)){
-  if(as.numeric(zip[i]) < 10000){
-    zip[i] <- paste0("0", zip[i])
-  }
-}
-
-#retest leading zips if they are correct zips
-
-table(ifelse(zip %in% USA_zippop$zipcode, T,F)) # None have leading zero issues. Use another method
+  if(nchar(as.numeric(zip[i])) < 5){
+    zip[i] <- paste0("0", zip[i])}}
 
 #insert zips in data
 
 group3$ZIP.code[which(zip_binary_map == F)] <- zip
 
 table(ifelse(group3$ZIP.code %in% USA_zippop$zipcode, T,F))
+'''
 
 rm(i, zip, zip_binary_map, zip_binary_map_1, unique_zips, unclean_zips) #remove these variables when done.
-
-#install.packages('stringr')
-
-table(str_detect( as.character(group3$ZIP.code), "[0-9]+$")) #looks like they're all numbers
-
-group3$zip_err_5less <- ifelse(nchar(group3$ZIP.code) >5 , 1,0) #6 entries greater than 5 digits
-
-table(group3$zip_err_5less )
-
-group3 <- subset(group3, nchar(group3$zip_err_5less)==T) #dropping the 6 rows that 
-
-group3 <- subset(group3, group3$ZIP.code %in% USA_zippop$zipcode) #dropping zips not in usa zip codes
 
 #Q3 ----
 
@@ -243,7 +170,7 @@ census_fips <- (paste(census$STATE, census$COUNTY, sep = ""))
 
 census <- cbind(census, census_fips)
 
-#Prep Split Dataset by Male/Female ----
+#Prep Split Dataset by Male/Female
 indx <- grepl('_FEMALE', colnames(census))
 female_df <- census[indx]
 rm(indx)
@@ -358,151 +285,17 @@ county_demos <- cbind(county_demos, combined_results4)
 merg_county_demos <- merge(county_demos, fips_data, by.x = 'Fips', by.y = "STCOUNTYFP")
 clean_group3 <- left_join(group3, merg_county_demos, by = c('ZIP.code' = 'ZIP'))
 
-#Q7------
+countydebt$`County FIPS` <- as.character(countydebt$`County FIPS`)
+hopefully_all <- left_join(clean_group3, countydebt, by = c('Fips' = 'County FIPS'))
 
-#making csvs to save time in cleanup -----
-#write.csv(group3, "cleangroup3.csv")
+
+#making csvs to save time in cleanup 
 #write.csv(county_demos, "county_demos.csv")
 #write.csv(census, "cleancensus.csv")
 #write.csv(merg_fips, 'merg_fips.csv')
+#write.csv(clean_group3, 'clean_group3.csv')
 
-data_census <- merge(merg_fips, census, by.x = 'STCOUNTYFP', by.y = "census_fips")
-
-write.csv(data_census, "final_group3.csv")
-
-
-
-### cluster analysis
-# must normalize data
-
-z <- male_df[,-c(1,25)]
-means <- apply(z,2,mean)
-sds <- apply(z,2,sd)
-nor <- scale(z,center=means,scale=sds)
-distance = dist(nor)
-
-library(factoextra)
-## 4 clusters for 4 race groups
-male_km <- kmeans(nor, 4, nstart = 79)
-print(male_km)
-fviz_cluster(male_km, data = nor,
-             palette = c("#2E9FDF", "#00AFBB", "#E7B800", "pink"),
-             geom = "point",
-             ellipse.type = "convex",ggtheme = theme_bw()
-)
-
-male_clusters <- male_km$cluster
-temp <- male_df[male_clusters==4,]
-
-print(temp)
-
-student.hclust = hclust(distance, method = 'average')
-print(student.hclust)
-plot(student.hclust, label=FALSE, main='Default from hclust for Student data')
-
-## Choose the number of clusters and get the groupings
-student_cut <- cutree(student.hclust, k = 5)
-table(student_cut)
-
-
-
-
-variance_explained <- male_re$sd^2/sum(male_re$sd^2)*100 
-variance_explained[1:which.max(variance_explained >= 0.9)] 
-
-qplot(c(1:length(variance_explained)) , variance_explained) + 
-  geom_line() + 
-  xlab("Principal Component") + 
-  ylab("Variance Explained") +
-  ggtitle("Scree Plot of Males Ethnicities") +
-  ylim(0, 100) 
-
-#install.packages('pls')
-library(pls)
-
-pls_model <- plsr(y_stan ~ ., data = as.data.frame(x_stan), ncomp = 12)  
-summary(pls_model) #99.92 of the variance explained with 4 comps
-
-pls_model$loadings[, 1:5]
-
-#rm(x_stan, y_stan, variance_explained, pls_model, male_re)
-
-
-
-library(ggcorrplot)
-library("FactoMineR")
-# PCA is based on correlations, not distance.
-## So we need to store the correlation matrix.
-corr_matrix <- cor(male_df[,-c(1, 25)])
-ggcorrplot(corr_matrix)
-
-## do PCA
-male_eth_race.pca <- princomp(corr_matrix)
-summary(male_eth_race.pca)
-fviz_eig(male_eth_race.pca, addlabels = TRUE)
-
-# loadings for first 5 components
-loadings_m <- male_eth_race.pca$loadings[, 1:5]
-loadings_m
-eigenvalues <- male_eth_race.pca$sdev^2
-
-loadings_original_scale <- loadings_m[, 1:5] * sqrt(eigenvalues)
-
-
-#scree plot
-variance_explained <- male_eth_race.pca $sd^2/sum(male_eth_race.pca$sd^2)*100 
-variance_explained[1:8] 
-qplot(c(1:8), variance_explained[1:8]) + 
-  geom_line() + 
-  xlab("Principal Component") + 
-  ylab("Variance Explained") +
-  ggtitle("Scree Plot") +
-  ylim(0, 100) 
-
-qplot(c(1:length(variance_explained[1:8])) , variance_explained[1:8]) + 
-  geom_line() + 
-  xlab("Principal Component") + 
-  ylab("Variance Explained") +
-  ggtitle("Scree Plot of Males Ethnicities") +
-  ylim(0, 100)
-
-
-
-
-
-
-
-
-
-
-
-
-#female PCA
-
-x_stan <- scale(female_df[,-c(1)])
-y_stan <- scale(female_df[, 1])
-
-female_re <- prcomp(x_stan)
-
-variance_explained <- female_re$sd^2/sum(female_re$sd^2)*100 
-variance_explained[1:which.max(variance_explained >= 0.9)] 
-
-qplot(c(1:length(variance_explained)) , variance_explained) + 
-  geom_line() + 
-  xlab("Principal Component") + 
-  ylab("Variance Explained") +
-  ggtitle("Scree Plot of Females Ethnicities") +
-  ylim(0, 100) 
-
-#install.packages('pls')
-library(pls)
-
-pls_model <- plsr(y_stan ~ ., data = as.data.frame(x_stan), ncomp = 12)  
-summary(pls_model) #99.93 of the variance explained with 4 comps
-
-pls_model$loadings[, 1:5]
-
-rm(x_stan, y_stan, variance_explained, pls_model, female_re)
+#Q7------
 
 
 
