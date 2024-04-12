@@ -45,7 +45,9 @@ group3$relief<- ifelse(group3$Company.response.to.consumer %in% c("Closed with m
 #Cleaning-----
 
 #drop non states 
-group3$drop<- as.numeric(group3$State %in% c("NONE", "None", "DC", "AA", "AS", "AP", "AE", "FM","GU", "MH", "MP", "PR", "VI", "UNITED STATES MINOR OUTLYING ISLANDS"))
+group3$drop <- as.numeric(group3$State %in% c("NONE", "None", "DC", "AA", "AS", "AP", "AE", "FM","GU", "MH", "MP", "PR", "VI", "UNITED STATES MINOR OUTLYING ISLANDS"))
+group3 <- subset(group3, !(State %in% c("AE", 'AP'))) #dropping military bases
+
 fips_data <- fips_data[!fips_data$STATE %in% c("NONE", "None", "DC", "AA", "AS", 'AP', "AE", "FM","GU", "MH", "MP", "PR", "VI", "UNITED STATES MINOR OUTLYING ISLANDS"),]
 
 countydebt <- countydebt[,-c(4, 7, 10, 13, 16, 19, 22, 26)]
@@ -109,12 +111,50 @@ group3$Dispute_prior <- ifelse(group3$Date.received  > '04/24/17', 1,0)
 unique(group3$Company.response.to.consumer)
 
 #Zip Code Cleaning -----
+USA_zippop <- zip_code_db
+
+#clean fips data first ----
+
+fips_data$ZIP <- as.character(fips_data$ZIP)
+group3$ZIP.code <- as.character(group3$ZIP.code)
+
+#check zips including numbers
+table(str_detect( as.character(fips_data$ZIP), "[0-9]+$")) #looks like they're all numbers
+
+#check zips less than 5 characters
+table(nchar(fips_data$ZIP) < 5) #2900 entries less than 5 digits - leading zeros?
+invalidzip <- fips_data$ZIP[nchar(fips_data$ZIP) < 5]
+
+table(nchar(fips_data$ZIP) > 5) #No entries greater than 5 digits
+
+#Check leading zeros
+table(grepl("^0", group3$ZIP.code)) #looks like they already have leading zeros
+
+#LEADING Zero Code replacement 
+#Place a leading zero for the problem zips
+zip <- as.numeric(fips_data$ZIP)
+for(i in 1:length(zip)){
+  if(nchar(as.numeric(zip[i])) < 5){
+    zip[i] <- paste0("0", zip[i])
+  }
+}
+
+fips_data$ZIP <- (zip)
+table(nchar(fips_data$ZIP) < 5 ) #incorrect zip identification
+
+error_zip <- fips_data[nchar(fips_data$ZIP) < 5, ]
+
+#manual fix 
+fips_data$ZIP[fips_data$ZIP == error_zip$ZIP] <- '00501'
+
+#Group3 fix zips -----
 
 #check zips including numbers
 table(str_detect( as.character(group3$ZIP.code), "[0-9]+$")) #looks like they're all numbers
 
 #check zips less than 5 characters
-table(nchar(group3$ZIP.code) >5) #No entries greater than 5 digits
+table(nchar(group3$ZIP.code) < 5) #No entries less than 5 digits
+table(nchar(group3$ZIP.code) > 5) #No entries greater than 5 digits
 
 #Check leading zeros
 table(grepl("^0", group3$ZIP.code)) #looks like they already have leading zeros
@@ -122,11 +162,41 @@ table(grepl("^0", group3$ZIP.code)) #looks like they already have leading zeros
 unique_zips <- unique(group3$ZIP.code)
 
 zip_binary_map <- unique_zips %in% fips_data$ZIP
+zip_binary_map <- unique_zips %in% USA_zippop$zipcode
+
+table(zip_binary_map)
 
 error_zips <- unique_zips[!zip_binary_map] #82 erroneous zips
+table(zip_binary_map)
 
 #replace military states with nearest, largest port state
-group3$State <- replace(group3$State, group3$State %in% c('AE', 'AP'), c('NY', 'CA'))
+#group3$State <- replace(group3$State, group3$State %in% c('AE', 'AP'), c('NY', 'CA'))
+
+for (error_state in unique(group3$State[group3$ZIP.code %in% error_zips])) {
+  mode_zip <- names(sort(table(group3$ZIP.code[group3$State == error_state]), decreasing = TRUE)[1])
+  group3$ZIP.code[group3$ZIP.code %in% error_zips & group3$State == error_state] <- mode_zip
+}
+
+
+#LEADING Zero Code replacement 
+#Place a leading zero for the problem zips
+zip <- as.character(group3$ZIP.code[zip_binary_map == FALSE])
+#for(i in 1:length(zip)){
+#  if(nchar(as.numeric(zip[i])) < 5){
+#    zip[i] <- paste0("0", zip[i])
+#  }
+#}
+
+#insert zips in data
+
+#Percusive Maintainence ---
+# run the loop until there are no issues
+
+error_zips <- unique_zips[!zip_binary_map] #82 erroneous zips
+table(zip_binary_map)
+
+#replace military states with nearest, largest port state
+#group3$State <- replace(group3$State, group3$State %in% c('AE', 'AP'), c('VA', 'CA'))
 
 for (error_state in unique(group3$State[group3$ZIP.code %in% error_zips])) {
   mode_zip <- names(sort(table(group3$ZIP.code[group3$State == error_state]), decreasing = TRUE)[1])
@@ -138,22 +208,7 @@ unique_zips <- unique(group3$ZIP.code)
 zip_binary_map <- unique_zips %in% fips_data$ZIP
 table(zip_binary_map) #looks like there are no issues anymore 
 
-'''
-#LEADING Zero Code replacement if we need it later
-#Place a leading zero for the problem zips
-zip <- as.character(group3$ZIP.code[zip_binary_map == FALSE])
-for(i in 1:length(zip)){
-  if(nchar(as.numeric(zip[i])) < 5){
-    zip[i] <- paste0("0", zip[i])}}
-
-#insert zips in data
-
-group3$ZIP.code[which(zip_binary_map == F)] <- zip
-
-table(ifelse(group3$ZIP.code %in% USA_zippop$zipcode, T,F))
-'''
-
-rm(i, zip, zip_binary_map, zip_binary_map_1, unique_zips, unclean_zips) #remove these variables when done.
+#rm(i, zip, zip_binary_map, zip_binary_map_1, unique_zips, unclean_zips) #remove these variables when done.
 
 #Q3 ----
 
@@ -288,12 +343,12 @@ clean_group3 <- left_join(group3, merg_county_demos, by = c('ZIP.code' = 'ZIP'))
 countydebt$`County FIPS` <- as.character(countydebt$`County FIPS`)
 hopefully_all <- left_join(clean_group3, countydebt, by = c('Fips' = 'County FIPS'))
 
-
 #making csvs to save time in cleanup 
-#write.csv(county_demos, "county_demos.csv")
+write.csv(county_demos, "county_demos.csv")
 #write.csv(census, "cleancensus.csv")
-#write.csv(merg_fips, 'merg_fips.csv')
-#write.csv(clean_group3, 'clean_group3.csv')
+write.csv(merg_fips, 'merg_fips.csv')
+write.csv(clean_group3, 'clean_group3.csv')
+write.csv(hopefully_all, 'hopefully.csv')
 
 #Q7------
 
