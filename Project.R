@@ -352,6 +352,44 @@ write.csv(hopefully_all, 'hopefully.csv')
 
 #Q7------
 
+temp <-  hopefully_all[, c(35:59)]
+temp <- sapply(temp, as.numeric)
+temp_nn <- na.omit(temp)
+#temp <- replace(temp, c('NA', "na"), NA)
+
+
+
+#### PCA
+library(ggcorrplot)
+library("FactoMineR")
+# PCA is based on correlations, not distance.
+## So we need to store the correlation matrix.
+
+corr_matrix <- cor(temp_nn)
+ggcorrplot(corr_matrix)
+
+## do PCA
+debt.pca <- princomp(corr_matrix)
+summary(debt.pca)
+fviz_eig(debt.pca, addlabels = TRUE)
+
+# loadings for first 5 components
+debt.pca$loadings[, 1:15]                       
+
+#scree plot
+variance_explained <- debt.pca$sd^2 / sum(debt.pca$sd^2)*100 
+
+variance_explained[1:7] 
+
+qplot(c(1:25), variance_explained) + 
+  geom_line() + 
+  xlab("Principal Component") + 
+  ylab("Variance Explained") +
+  ggtitle("Scree Plot") +
+  ylim(0, 100)                    
+
+
+
 
 
 
