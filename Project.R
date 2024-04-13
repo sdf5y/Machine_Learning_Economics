@@ -362,6 +362,7 @@ temp_nn <- na.omit(temp)
 #### PCA
 library(ggcorrplot)
 library("FactoMineR")
+library(factoextra)
 # PCA is based on correlations, not distance.
 ## So we need to store the correlation matrix.
 
@@ -373,8 +374,15 @@ debt.pca <- princomp(corr_matrix)
 summary(debt.pca)
 fviz_eig(debt.pca, addlabels = TRUE)
 
+comps <- debt.pca$scores[,1:5]
+
+debt.pca$
+
+data.frame(hopefully_all[,36], debt.pca$scores[,1:5])
+cbind(countydebt , comps)
+
 # loadings for first 5 components
-debt.pca$loadings[, 1:15]                       
+debt.pca$loadings[, 1:5]                       
 
 #scree plot
 variance_explained <- debt.pca$sd^2 / sum(debt.pca$sd^2)*100 
@@ -388,9 +396,12 @@ qplot(c(1:25), variance_explained) +
   ggtitle("Scree Plot") +
   ylim(0, 100)                    
 
+temp2 <- cbind(hopefully_all, comps)
 
+colnames(temp2)
 
-
+temp2$Comp.1
+#write.csv(temp2, 'straightouttacompton.csv')
 
 
 ### Clustering code -----
