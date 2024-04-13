@@ -16,7 +16,9 @@ library(ggplot2)
 library(cowplot)
 library(scales)
 library(corrplot)
+#install.packages('clustMixType')
 library(clustMixType)
+#install.packages('wesanderson')
 library(wesanderson)
 #install.packages("zipcodeR")
 library(zipcodeR)
@@ -50,7 +52,7 @@ group3 <- subset(group3, !(State %in% c("AE", 'AP'))) #dropping military bases
 
 fips_data <- fips_data[!fips_data$STATE %in% c("NONE", "None", "DC", "AA", "AS", 'AP', "AE", "FM","GU", "MH", "MP", "PR", "VI", "UNITED STATES MINOR OUTLYING ISLANDS"),]
 
-countydebt <- countydebt[,-c(4, 7, 10, 13, 16, 19, 22, 26)]
+#countydebt <- countydebt[,-c(4, 7, 10, 13, 16, 19, 22, 26)]
 
 countydebt$`County FIPS` <- as.numeric(countydebt$`County FIPS`)
 
@@ -164,9 +166,9 @@ unique_zips <- unique(group3$ZIP.code)
 zip_binary_map <- unique_zips %in% fips_data$ZIP
 zip_binary_map <- unique_zips %in% USA_zippop$zipcode
 
-table(zip_binary_map)
+table(zip_binary_map) #45 incorrect zips
 
-error_zips <- unique_zips[!zip_binary_map] #82 erroneous zips
+error_zips <- unique_zips[!zip_binary_map] #45 erroneous zips
 table(zip_binary_map)
 
 #replace military states with nearest, largest port state
@@ -333,6 +335,10 @@ combined_results4 <- do.call(rbind, results_list4)
 
 county_demos <- cbind(county_demos, combined_results4)
 
+#include male and female county totals
+county_demos$TotalMale <- county_totals$TOM_MALE
+county_demos$TotalFemale <- county_totals$TOT_FEMALE
+
 #Q6-----
 
 #matching fips to zips
@@ -340,24 +346,22 @@ county_demos <- cbind(county_demos, combined_results4)
 merg_county_demos <- merge(county_demos, fips_data, by.x = 'Fips', by.y = "STCOUNTYFP")
 clean_group3 <- left_join(group3, merg_county_demos, by = c('ZIP.code' = 'ZIP'))
 
+clean_group3$Fips <- as.character(clean_group3$Fips)
 countydebt$`County FIPS` <- as.character(countydebt$`County FIPS`)
 hopefully_all <- left_join(clean_group3, countydebt, by = c('Fips' = 'County FIPS'))
 
 #making csvs to save time in cleanup 
-write.csv(county_demos, "county_demos.csv")
-#write.csv(census, "cleancensus.csv")
-write.csv(merg_fips, 'merg_fips.csv')
-write.csv(clean_group3, 'clean_group3.csv')
-write.csv(hopefully_all, 'hopefully.csv')
+#write.csv(county_demos, "county_demos.csv")
+#write.csv(merg_fips, 'merg_fips.csv')
+#write.csv(clean_group3, 'clean_group3.csv')
+#write.csv(hopefully_all, 'hopefully.csv')
 
 #Q7------
-
-temp <-  hopefully_all[, c(35:59)]
+colnames(hopefully_all)
+temp <-  hopefully_all[, c(35:55)]
 temp <- sapply(temp, as.numeric)
 temp_nn <- na.omit(temp)
 #temp <- replace(temp, c('NA', "na"), NA)
-
-
 
 #### PCA
 library(ggcorrplot)
@@ -374,70 +378,119 @@ debt.pca <- princomp(corr_matrix)
 summary(debt.pca)
 fviz_eig(debt.pca, addlabels = TRUE)
 
-comps <- debt.pca$scores[,1:5]
-
-debt.pca$
-
-data.frame(hopefully_all[,36], debt.pca$scores[,1:5])
-cbind(countydebt , comps)
+comps <- debt.pca$scores[,1:4]
 
 # loadings for first 5 components
-debt.pca$loadings[, 1:5]                       
+debt.pca$loadings[, 1:4]                       
 
 #scree plot
 variance_explained <- debt.pca$sd^2 / sum(debt.pca$sd^2)*100 
 
 variance_explained[1:7] 
 
-qplot(c(1:25), variance_explained) + 
+qplot(c(1:21), variance_explained) + 
   geom_line() + 
   xlab("Principal Component") + 
   ylab("Variance Explained") +
   ggtitle("Scree Plot") +
   ylim(0, 100)                    
 
-temp2 <- cbind(hopefully_all, comps)
+temp2 <- cbind(hopefully_all[,-c(35:55)], comps)
 
 colnames(temp2)
 
-temp2$Comp.1
 #write.csv(temp2, 'straightouttacompton.csv')
 
+######## PRIOR CODE GENERATES CSVs. LOAD CSV FROM HERE ONWARD ########--------
 
-### Clustering code -----
+NWA <- read.csv('straightouttacompton.csv')
+NWA <- NWA[,-1]
+
+colnames(NWA)
+
+#Question 8 ----
+
+### Clustering code
 # make a separate dataset, and then make sure each variable is the right class. 
-ca <- group3[, c("Sub.product",
-                 "Issue",
-                 "Share.with.any.debt.in.collections..All" ,
-                 "Share.of.people.of.color",
-                 "Average.household.income..All",
-                 "pct_female")    ]
-ca[,1]<- as.factor(ca[,1] )
-ca[,2]<- as.factor(ca[,2] )
-ca[,3]<- scale(as.numeric(ca[,3] ))
-ca[,4]<- scale(as.numeric(ca[,4] ))
-ca[,5]<- scale(as.numeric(ca[,5] ))
-ca[,6]<- scale(as.numeric(ca[,6] ))
+set.seed(23748234)
 
+ca <- NWA[, c("Sub.product",
+                 "Issue",
+                 "Pop_over64",
+                 "TotalFemale",
+                 "Average.household.income..Comm.of.color",
+                 "Share.of.people.of.color")    ]
+
+ca[,1] <- as.factor(ca[,1] )
+ca[,2] <- as.factor(ca[,2] )
+ca[,3] <- scale(as.numeric(ca[,3] ))
+ca[,4] <- scale(as.numeric(ca[,4] ))
+ca[,5] <- scale(as.numeric(ca[,5] ))
+ca[,6] <- scale(as.numeric(ca[,6] ))
+
+colnames(ca) <- c("Sub.product",
+                  "Issue",
+                  "Pop_over64",
+                  "TotalFemale",
+                  "Average.household.income..Comm.of.color",
+                  "Share.of.people.of.color") 
+
+ca$medicaldebt <- as.factor(ifelse(ca$Sub.product == "Medical debt", 1,0))
+
+count(is.na(ca))
+
+ca <- ca %>%
+  filter(complete.cases(.))
 
 # 2 cluster
-kpres2 <-kproto(x=ca,k=2)
+kpres2 <- kproto(x=ca[,c(2:7)], k=2, na.rm = 'imp.internal')
+
 # 3 cluster
-kpres3 <-kproto(x=ca,k=3)
+kpres3 <- kproto(x=ca[,c(2:7)], k=3,  na.rm = 'imp.internal')
+
 # Plots
-clprofiles(kpres2, ca, col=wes_palette("Royal1",4, type="continuous")) 
+clprofiles(kpres3, ca[,c(2:7)], col = wes_palette("Royal1", 4, type = "continuous")) #c('blue', 'red', 'green')) 
+
 # scree plot
 
 n.scree<-ncol(ca)-2
 Es<- numeric(n.scree)
 for(i in 1:n.scree){ 
-  kpres<-kproto(ca,k=i,nstart=5, verbose = FALSE) 
-  Es[i]<-kpres$tot.withinss } 
+  kpres <- kproto(ca,k=i,nstart=5, verbose = FALSE) 
+  Es[i] <- kpres$tot.withinss 
+} 
 
-plot(1:n.scree, Es[1:5], type="b",ylab="ObjectiveFunction",
+plot(1:n.scree, Es[1:5], type="b", ylab="ObjectiveFunction",
      xlab="#Clusters", main="ScreePlot") #figure2
 
+NWA$MedicalDebtClusters <- kpres3$cluster
 
+colnames(NWA) 
 
+write.csv(NWA, 'q9.csv')
 
+#Q9 -----
 
+q9 <- read.csv('q9.csv')
+colnames(q9)
+
+'''
+drop: Consumer.complaint.narrative, Company, Tags,
+      Date.sent.to.company, Complaint.ID, County.Name, State.Name
+
+Factor: Date by Year (7 levels)
+
+'''
+
+substrRight <- function(x, n){
+  substr(x, nchar(x)-n+1, nchar(x))
+}
+
+q9$year_end <- substrRight(q9$Date.received, 2)
+for(i in 1:length(q9)){
+    q9$Year[i] <- paste0("20", q9$year_end[i])
+}
+
+#can't drop - figure it out
+q9 <- q9[,-c( 'Date.received', 'year_end', 'Consumer.complaint.narrative', 'Company', 'Tags',
+            'Date.sent.to.company', 'Complaint.ID', 'County.Name', 'State.Name')]
