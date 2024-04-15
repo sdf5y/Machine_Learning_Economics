@@ -494,3 +494,7 @@ for(i in 1:length(q9)){
 #can't drop - figure it out
 q9 <- q9[,-c( 'Date.received', 'year_end', 'Consumer.complaint.narrative', 'Company', 'Tags',
             'Date.sent.to.company', 'Complaint.ID', 'County.Name', 'State.Name')]
+
+q9<-q9%>%
+  select(-Date.received, -year_end, -Consumer.complaint.narrative, -Company, -Tags, 
+         -Date.sent.to.company, -Complaint.ID, -County.Name, -State.Name)
