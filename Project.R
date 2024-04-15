@@ -491,10 +491,11 @@ for(i in 1:length(q9)){
     q9$Year[i] <- paste0("20", q9$year_end[i])
 }
 
-#can't drop - figure it out
-q9 <- q9[,-c( 'Date.received', 'year_end', 'Consumer.complaint.narrative', 'Company', 'Tags',
-            'Date.sent.to.company', 'Complaint.ID', 'County.Name', 'State.Name')]
-
 q9<-q9%>%
-  select(-Date.received, -year_end, -Consumer.complaint.narrative, -Company, -Tags, 
+  select(-X, Date.received, -year_end, -Consumer.complaint.narrative, -Company, -Tags, 
          -Date.sent.to.company, -Complaint.ID, -County.Name, -State.Name)
+
+table(q9$Year) #we are dropping the variables below the year 2024
+
+q9 <- subset(q9, Year == 2024)
+write.csv(q9, "q9.csv")
