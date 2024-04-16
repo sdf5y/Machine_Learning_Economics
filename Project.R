@@ -52,6 +52,11 @@ group3 <- subset(group3, !(State %in% c("AE", 'AP'))) #dropping military bases
 
 fips_data <- fips_data[!fips_data$STATE %in% c("NONE", "None", "DC", "AA", "AS", 'AP', "AE", "FM","GU", "MH", "MP", "PR", "VI", "UNITED STATES MINOR OUTLYING ISLANDS"),]
 
+ctfips <-  (ifelse((fips_data$STATE == 'CT' & str_detect(fips_data$STCOUNTYFP, "9")), 
+       as.numeric(paste0("01", fips_data$STCOUNTYFP)), fips_data$STCOUNTYFP))
+
+fips_data$STCOUNTYFP <- ctfips
+
 #countydebt <- countydebt[,-c(4, 7, 10, 13, 16, 19, 22, 26)]
 
 countydebt$`County FIPS` <- as.numeric(countydebt$`County FIPS`)
@@ -164,12 +169,10 @@ table(grepl("^0", group3$ZIP.code)) #looks like they already have leading zeros
 unique_zips <- unique(group3$ZIP.code)
 
 zip_binary_map <- unique_zips %in% fips_data$ZIP
-zip_binary_map <- unique_zips %in% USA_zippop$zipcode
 
 table(zip_binary_map) #45 incorrect zips
 
 error_zips <- unique_zips[!zip_binary_map] #45 erroneous zips
-table(zip_binary_map)
 
 #replace military states with nearest, largest port state
 #group3$State <- replace(group3$State, group3$State %in% c('AE', 'AP'), c('NY', 'CA'))
@@ -178,7 +181,6 @@ for (error_state in unique(group3$State[group3$ZIP.code %in% error_zips])) {
   mode_zip <- names(sort(table(group3$ZIP.code[group3$State == error_state]), decreasing = TRUE)[1])
   group3$ZIP.code[group3$ZIP.code %in% error_zips & group3$State == error_state] <- mode_zip
 }
-
 
 #LEADING Zero Code replacement 
 #Place a leading zero for the problem zips
@@ -351,14 +353,14 @@ countydebt$`County FIPS` <- as.character(countydebt$`County FIPS`)
 hopefully_all <- left_join(clean_group3, countydebt, by = c('Fips' = 'County FIPS'))
 
 #making csvs to save time in cleanup 
-#write.csv(county_demos, "county_demos.csv")
-#write.csv(merg_fips, 'merg_fips.csv')
-#write.csv(clean_group3, 'clean_group3.csv')
-#write.csv(hopefully_all, 'hopefully.csv')
+write.csv(county_demos, "county_demos.csv")
+write.csv(merg_fips, 'merg_fips.csv')
+write.csv(clean_group3, 'clean_group3.csv')
+write.csv(hopefully_all, 'hopefully.csv')
 
 #Q7------
 colnames(hopefully_all)
-temp <-  hopefully_all[, c(35:55)]
+temp <-  hopefully_all[, c(38:58)]
 temp <- sapply(temp, as.numeric)
 temp_nn <- na.omit(temp)
 #temp <- replace(temp, c('NA', "na"), NA)
@@ -399,7 +401,7 @@ temp2 <- cbind(hopefully_all[,-c(35:55)], comps)
 
 colnames(temp2)
 
-#write.csv(temp2, 'straightouttacompton.csv')
+write.csv(temp2, 'straightouttacompton.csv')
 
 ######## PRIOR CODE GENERATES CSVs. LOAD CSV FROM HERE ONWARD ########--------
 
@@ -439,8 +441,8 @@ ca$medicaldebt <- as.factor(ifelse(ca$Sub.product == "Medical debt", 1,0))
 
 count(is.na(ca))
 
-ca <- ca %>%
-  filter(complete.cases(.))
+#ca <- ca %>%
+ # filter(complete.cases(.))
 
 # 2 cluster
 kpres2 <- kproto(x=ca[,c(2:7)], k=2, na.rm = 'imp.internal')
@@ -474,14 +476,6 @@ write.csv(NWA, 'q9.csv')
 q9 <- read.csv('q9.csv')
 colnames(q9)
 
-'''
-drop: Consumer.complaint.narrative, Company, Tags,
-      Date.sent.to.company, Complaint.ID, County.Name, State.Name
-
-Factor: Date by Year (7 levels)
-
-'''
-
 substrRight <- function(x, n){
   substr(x, nchar(x)-n+1, nchar(x))
 }
@@ -491,11 +485,24 @@ for(i in 1:length(q9)){
     q9$Year[i] <- paste0("20", q9$year_end[i])
 }
 
-q9<-q9%>%
-  select(-X, Date.received, -year_end, -Consumer.complaint.narrative, -Company, -Tags, 
-         -Date.sent.to.company, -Complaint.ID, -County.Name, -State.Name)
+q9 <- q9 %>%
+  select(Sub.product, Issue, Sub.issue, State, ZIP.code, Tags, Consumer.consent.provided., Submitted.via, Timely.response. , relief, drop, 
+  Dispute_prior, servicemenber, olderAm, Fips, Pop_less25, Pop_over64, Pop_Hispanic, w_total, b_total, a_total, combo_native_total, TotalMale,
+  TotalFemale,  Median.credit.card.delinquent.debt..All, Median.credit.card.delinquent.debt..Comm.of.color, Median.credit.card.delinquent.debt..White.comm, 
+ Share.of.people.of.color, Average.household.income..All, Average.household.income..Comm.of.color, Average.household.income..White.comm,
+ Comp.1, Comp.2,Comp.3, Comp.4, MedicalDebtClusters,  Year)
 
 table(q9$Year) #we are dropping the variables below the year 2024
 
 q9 <- subset(q9, Year == 2024)
 write.csv(q9, "q9.csv")
+
+q9 <- q9[,-37] #dropping year variable
+
+#make factors
+q9_temp <- data.frame(
+  lapply(q9, function(x) {
+    if(is.character(x)) factor(x) else x
+  })
+)
+
