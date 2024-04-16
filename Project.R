@@ -487,9 +487,9 @@ for(i in 1:length(q9)){
 
 q9 <- q9 %>%
   select(Sub.product, Issue, Sub.issue, State, ZIP.code, Tags, Consumer.consent.provided., Submitted.via, Timely.response. , relief, drop, 
-  Dispute_prior, servicemenber, olderAm, Fips, Pop_less25, Pop_over64, Pop_Hispanic, w_total, b_total, a_total, combo_native_total, TotalMale,
-  TotalFemale,  Median.credit.card.delinquent.debt..All, Median.credit.card.delinquent.debt..Comm.of.color, Median.credit.card.delinquent.debt..White.comm, 
- Share.of.people.of.color, Average.household.income..All, Average.household.income..Comm.of.color, Average.household.income..White.comm,
+  Dispute_prior, servicemenber, olderAm, 
+  Fips, Pop_less25, Pop_over64, Pop_Hispanic, w_total, b_total, a_total, combo_native_total, TotalMale, TotalFemale,
+  Share.of.people.of.color, Average.household.income..All, Average.household.income..Comm.of.color, Average.household.income..White.comm,
  Comp.1, Comp.2,Comp.3, Comp.4, MedicalDebtClusters,  Year)
 
 table(q9$Year) #we are dropping the variables below the year 2024
