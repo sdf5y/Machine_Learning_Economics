@@ -494,14 +494,14 @@ q9 <- q9 %>%
 
 table(q9$Year) #we are dropping the variables below the year 2024
 
-q9 <- subset(q9, Year == 2024)
-write.csv(q9, "q9.csv")
+q9_2 <- subset(q9, Year == 2024)
+write.csv(q9_2, "q9.csv")
 
-q9 <- q9[,-37] #dropping year variable
+q9_2 <- q9_2[,-37] #dropping year variable
 
 #make factors
-q9_temp <- data.frame(
-  lapply(q9, function(x) {
+q9_s <- data.frame(
+  lapply(q9_2, function(x) {
     if(is.character(x)) factor(x) else x
   })
 )
