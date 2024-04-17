@@ -506,3 +506,18 @@ q9_s <- data.frame(
   })
 )
 
+
+##### train and test ------
+library(caTools)
+set.seed(27514234556432)
+split <- sample.split(q9_s, SplitRatio = 0.7)
+train <- subset(q9_s, split == "TRUE")
+test <- subset(q9_s, split == "FALSE")
+
+#Models -----
+
+model <- glm(relief ~ train$Issue + train$Pop_less25 + train$Pop_over64 + train$Median.credit.card.delinquent.debt..All, data = train)
+
+plot(model)
+
+q9_s[,c(16:31)] <- log(q9_s[,c(16:31)])
