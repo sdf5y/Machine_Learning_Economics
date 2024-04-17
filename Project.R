@@ -113,7 +113,9 @@ group3 <- group3 %>%
                                                 Consumer.consent.provided. == "N/A" ~ "No consent provided"))
 
 #Dummy for after date (form changes NA imputation)
-group3$Dispute_prior <- ifelse(group3$Date.received  > '04/24/17', 1,0)
+group3$Date.received <- as.Date(group3$Date.received, format = "%m/%d/%y")
+
+group3$Dispute_prior <- ifelse(group3$Date.received  > as.Date('04/24/17', format= "%m/%d/%y"), 1,0)
 
 unique(group3$Company.response.to.consumer)
 
