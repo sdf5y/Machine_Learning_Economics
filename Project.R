@@ -172,9 +172,12 @@ unique_zips <- unique(group3$ZIP.code)
 
 zip_binary_map <- unique_zips %in% fips_data$ZIP
 
-table(zip_binary_map) #45 incorrect zips
+table(zip_binary_map)
 
 error_zips <- unique_zips[!zip_binary_map] #45 erroneous zips
+
+#T.test of error zips -----
+t.test(table(zip_binary_map), alternative = 'two.sided') #fail to reject the null - the error zips are not significant at 5% level
 
 #replace military states with nearest, largest port state
 #group3$State <- replace(group3$State, group3$State %in% c('AE', 'AP'), c('NY', 'CA'))
@@ -282,8 +285,6 @@ county_demos <- cbind(bind_rows(results_list, .id = "Pop_less25"), bind_rows(res
 
 colnames(county_demos) <- c("Fips", "Pop_less25", "Fips", "Pop_over64", "Pop_Hispanic")
 county_demos <- county_demos[,-3]
-
-#combo_demographies <- merge(county_totals, temp, by.x = 'census_fips', by.y = 'Fips')
 
 #older Americans and servicefolk
 group3$servicemenber <- ifelse(str_detect(group3$Tags, "Servicemember"), 1, 0)
@@ -399,7 +400,7 @@ qplot(c(1:21), variance_explained) +
   ggtitle("Scree Plot") +
   ylim(0, 100)                    
 
-temp2 <- cbind(hopefully_all[,-c(35:55)], comps)
+temp2 <- cbind(hopefully_all[,-c(35:58)], comps)
 
 colnames(temp2)
 
@@ -443,8 +444,7 @@ ca$medicaldebt <- as.factor(ifelse(ca$Sub.product == "Medical debt", 1,0))
 
 count(is.na(ca))
 
-ca <- ca %>%
-  filter(complete.cases(.))
+#ca <- ca %>%  filter(complete.cases(.))
 
 # 2 cluster
 kpres2 <- kproto(x=ca[,c(2:7)], k=2, na.rm = 'imp.internal')
@@ -478,14 +478,9 @@ write.csv(NWA, 'q9.csv')
 q9 <- read.csv('q9.csv')
 colnames(q9)
 
-substrRight <- function(x, n){
-  substr(x, nchar(x)-n+1, nchar(x))
-}
+library(lubridate)
 
-q9$year_end <- substrRight(q9$Date.received, 2)
-for(i in 1:length(q9)){
-    q9$Year[i] <- paste0("20", q9$year_end[i])
-}
+q9$Year <- year(q9$Date.received)
 
 q9 <- q9 %>%
   select(Sub.product, Issue, Sub.issue, State, ZIP.code, Tags, Consumer.consent.provided., Submitted.via, Timely.response. , relief, drop, 
@@ -496,16 +491,16 @@ q9 <- q9 %>%
 
 table(q9$Year) #we are dropping the variables below the year 2024
 
-q9_2 <- subset(q9, Year == 2024)
-write.csv(q9_2, "q9_2.csv")
+#q9_2 <- subset(q9, Year == 2024)
+write.csv(q9, "q9.csv")
 
-q9_2 <- q9_2[,-37] #dropping year variable
+#q9_2 <- q9_2[,-37] #dropping year variable
 
-# Transformations -------
+#Transformations -------
 
 #make factors
 q9_s <- data.frame(
-  lapply(q9_2, function(x) {
+  lapply(q9, function(x) {
     if(is.character(x)) factor(x) else x
   })
 )
