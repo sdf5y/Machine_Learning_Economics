@@ -501,6 +501,8 @@ write.csv(q9_2, "q9.csv")
 
 q9_2 <- q9_2[,-37] #dropping year variable
 
+# Transformations -------
+
 #make factors
 q9_s <- data.frame(
   lapply(q9_2, function(x) {
@@ -508,6 +510,22 @@ q9_s <- data.frame(
   })
 )
 
+logged_vs <- log(q9_s[,c(16:28)])
+lognames <- colnames(logged_vs)
+lognames <- paste("log", lognames)
+colnames(logged_vs) <- lognames
+
+squared_vs <- q9_s[,c(16:28)]^2
+sqnames <- colnames(squared_vs)
+sqnames <- paste("sq", sqnames)
+colnames(squared_vs) <- sqnames
+
+standardized_vs <- scale(q9_s[,c(16:28)])
+stan_names <- colnames(standardized_vs)
+stan_names <- paste("stan", stan_names)
+colnames(standardized_vs) <- stan_names
+
+q9_s <- cbind(q9_s, logged_vs, squared_vs, standardized_vs)
 
 ##### train and test ------
 library(caTools)
