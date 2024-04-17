@@ -412,7 +412,7 @@ NWA <- NWA[,-1]
 
 colnames(NWA)
 
-#Question 8 ----
+#Q8 ----
 
 ### Clustering code
 # make a separate dataset, and then make sure each variable is the right class. 
@@ -443,8 +443,8 @@ ca$medicaldebt <- as.factor(ifelse(ca$Sub.product == "Medical debt", 1,0))
 
 count(is.na(ca))
 
-#ca <- ca %>%
- # filter(complete.cases(.))
+ca <- ca %>%
+  filter(complete.cases(.))
 
 # 2 cluster
 kpres2 <- kproto(x=ca[,c(2:7)], k=2, na.rm = 'imp.internal')
@@ -497,7 +497,7 @@ q9 <- q9 %>%
 table(q9$Year) #we are dropping the variables below the year 2024
 
 q9_2 <- subset(q9, Year == 2024)
-write.csv(q9_2, "q9.csv")
+write.csv(q9_2, "q9_2.csv")
 
 q9_2 <- q9_2[,-37] #dropping year variable
 
@@ -528,16 +528,38 @@ colnames(standardized_vs) <- stan_names
 q9_s <- cbind(q9_s, logged_vs, squared_vs, standardized_vs)
 
 ##### train and test ------
+library(caret)
+train_control <- trainControl(method = "cv", 
+                              number = 10) 
+
 library(caTools)
 set.seed(27514234556432)
 split <- sample.split(q9_s, SplitRatio = 0.7)
 train <- subset(q9_s, split == "TRUE")
 test <- subset(q9_s, split == "FALSE")
 
-#Models -----
+#Q10-----
 
-model <- glm(relief ~ train$Issue + train$Pop_less25 + train$Pop_over64 + train$Median.credit.card.delinquent.debt..All, data = train)
+#logit----
+logit_m <- glm(relief ~ ., data = train)
 
-plot(model)
+plot(logit_m)
 
-q9_s[,c(16:31)] <- log(q9_s[,c(16:31)])
+summary(logit_m)
+
+model <- train(relief ~ Share.of.people.of.color, data = q9_s,  
+               method = "glm", 
+               trControl = train_control)
+
+forward_glm <- step(glm1.5, direction = "forward", scope = formula(~ .))
+backward_glm <- step(glm1.5, direction = "backward", scope = formula(~ .))  
+step_glm <- step(glm1.5, direction = "both", scope = formula(~ .)) 
+
+
+#lasso ----
+
+#regression tree----
+
+#Random Forest-----
+
+#Gradient Boosting/ XGBoost------
