@@ -550,32 +550,19 @@ forward_glm <- step(glm1.5, direction = "forward", scope = formula(~ .))
 backward_glm <- step(glm1.5, direction = "backward", scope = formula(~ .))  
 step_glm <- step(glm1.5, direction = "both", scope = formula(~ .)) 
 
-
 #lasso ----
+library(glmnet)
 
-## Can use the default grid search for lambda or customize as below
-grid <- 10^seq(10, -2, length = 100)
-lasso.glm <- glmnet(x[train , ], y[train], alpha = 1,
-                    lambda = grid)
+X <- model.matrix(q9_2$relief ~., data = q9_2)[, -1]  # Predictors
+Y <- q9_2$relief
 
-# plots coefficients versus normalization.
-plot(lasso.glm)
-set.seed(186243)
+#Lasso logistic regression model with 10-fold cross-validation
+logit_model <- cv.glmnet(X, Y, alpha = 1, family = "binomial", link = "logit", nfolds = 10, newx = X)
 
-# alpha=1 chooses a lasso model in glmnet. ridge regresssion is aplpha=0.
-cv.out <- cv.glmnet(x[train , ], y[train], alpha = 1)
-cv.out$lambda.min
-
-## plot best value of lambda will be between the dotted lines.
-plot(cv.out)
-bestlam.lasso <- cv.out$lambda.min
-lasso.pred <- predict(lasso.glm , s = bestlam.lasso ,
-                      newx = x[test , ])
-mean((lasso.pred - y.test)^2)
+coef(logit_model, s = "lambda.min")
 
 #regression tree----
 ### tree
-
 set.seed(27514)
 split.uber <- sample.split(trip1.1, SplitRatio = 0.5)
 train_uber <- subset(trip1.1, split.uber == "TRUE")
