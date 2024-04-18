@@ -563,36 +563,36 @@ coef(logit_model, s = "lambda.min")
 
 #regression tree----
 ### tree
-set.seed(27514)
-split.uber <- sample.split(trip1.1, SplitRatio = 0.5)
-train_uber <- subset(trip1.1, split.uber == "TRUE")
-test_uber <- subset(trip1.1, split.uber == "FALSE")
-
-intrain <- createDataPartition(y = trip1.1$Uber, p= 0.7)[[1]]
-train_uber <- trip1.1[intrain,]
-test_uber <- trip1.1[-intrain,]
+intrain <- createDataPartition(y = q9_s$relief, p= 0.8)[[1]]
+train_q9_s <- q9_s[intrain,]
+test_q9_s <- q9_s[-intrain,]
 
 library(rpart)
-#install.packages('rpart.plot')
 library(rpart.plot)
-### Rpart tree parameters, defualts below.
-## Rpart uses K fold automatically to determine
-# cost complexity parameter cp
-## minsplit is the min # of obs for a split attempt.
-## minbucket is the min # obs in a terminal node
-## xval= is the number of CVs
-rpart.control(minsplit = 20, minbucket = round(minsplit/3), cp = 0.01,
+
+minsplit <- 20
+
+rpart.control_params <- rpart.control(minsplit = 20, minbucket = round(minsplit/3), cp = 0.00001,
               maxcompete = 4, maxsurrogate = 5, usesurrogate = 2, xval = 10,
               surrogatestyle = 0, maxdepth = 30)
 
-uber.tree <- rpart(Uber~., data= train_uber, method = "anova")
+relief.tree <- rpart(relief~., data= train_q9_s, control = rpart.control_params, method = "class")
 
-summary(uber.tree)
+summary(relief.tree)
 
-rpart.plot(uber.tree)
+rpart.plot(relief.tree)
 
-uber.tree$variable.importance
+relief.tree$variable.importance
 
+# Make predictions using the trained model
+predicted_labels <- predict(relief.tree, newdata = test_q9_s, type = "class")
+
+# Calculate misclassification rate
+misclassification_rate <- mean(predicted_labels != test_q9_s$relief)
+
+# Print the misclassification rate
+print(misclassification_rate
+      
 #Random Forest:
 #Fitting Random forest to the train data: 
 set.seed(275142)
