@@ -606,27 +606,24 @@ rpart.plot(uber.tree)
 
 uber.tree$variable.importance
 
-#Random Forest-----
-library(randomForest)
-#install.packages('randomForestExplainer')
-library(randomForestExplainer)
-set.seed(982465)
-
-##### Full data set for OOB
-uber.rf.mean <- randomForest(Uber~., data= trip1.1,
+#Random Forest:
+#Fitting Random forest to the train data: 
+set.seed(275142)
+RF<- randomForest(relief~., data= train,
                              importance=TRUE, ntree=500)
-uber.rf.mean
-plot(uber.rf.mean)
 
-## variable importance
-uber.rf.mean$importance
+RF
+plot(RF)
 
-## Other importance variables
-importance_frame <- measure_importance(uber.rf.mean)
+#Checking at importance: 
+RF$importance
+
+#Importance frame: 
+importance_frame <- measure_importance(RF)
 importance_frame
 
 ### plot variable depth
-min_depth_frame <- min_depth_distribution(uber.rf.mean)
+min_depth_frame<- min_depth_distribution(RF)
 head(min_depth_frame, n = 10)
 plot_min_depth_distribution(min_depth_frame)
 
@@ -637,14 +634,40 @@ plot_multi_way_importance(importance_frame, size_measure = "no_of_nodes")
 ## pick 5 most important variables
 (vars <- important_variables(importance_frame, k = 5, measures =
                                c("mean_min_depth", "no_of_trees")))
-interactions_frame <- min_depth_interactions(bnb.rf.mean, vars)
+interactions_frame <- min_depth_interactions(RF, vars)
 head(interactions_frame[order(interactions_frame$occurrences, decreasing = TRUE), ])
 plot_min_depth_interactions(interactions_frame)
 
-#Gradient Boosting/ XGBoost------
-### Grid serching hyperparameter values
-# = parameters = #
-# = eta candidates = #
+#XG Boost:
+split.imp <- sample.split(train, SplitRatio = 0.7)
+train1 <-  subset(q9_clean, split.imp == "TRUE")
+test1 <- subset(q9_clean, split.imp == "FALSE")
+
+# make them numeric matrix
+xtrain<-sparse.model.matrix(relief ~. -1, data = train1)
+ytrain <- as.array(train1$relief)
+xtest <- sparse.model.matrix(relief ~ .-1, data = test1)
+ytest <- as.array(test1$relief)
+
+### run train model
+xgb1 <- xgboost(data = xtrain, label = ytrain,
+                nrounds = 100)
+
+# run test model
+y_pred <- predict(xgb1, xtest)
+# get MSE
+test.MSE<-mean((ytest - y_pred)^2)
+test.MSE
+# get residual (if continuous outcome)
+r<-ytest - y_pred
+qqnorm(r)
+
+### plot
+### plot
+xgb.plot.multi.trees(xgb1)
+
+
+#eta:
 eta=c(0.05, 0.1, 0.2,0.5,1)
 
 # = colsample_bylevel candidates = #
@@ -665,7 +688,7 @@ mcw=c(1,10,100,400)
 # = gamma candidates = #
 gamma=c(0.1,1,10,100)
 
-### Eta search -----
+#a) ETA search:
 set.seed(13856)
 conv_eta = matrix(NA,500,length(eta))
 pred_eta = matrix(NA,nrow(ytest), length(eta))
@@ -680,16 +703,16 @@ for(i in 1:length(eta)){
   pred_eta[,i] = predict(xgb, xtest)
 }
 
+
 conv_eta = data.frame(iter=1:500, conv_eta)
 conv_eta = melt(conv_eta, id.vars = "iter")
 ggplot(data = conv_eta) + geom_line(aes(x = iter, y = value, color = variable))
 (RMSE_eta = sqrt(colMeans((as.numeric(ytest)-pred_eta)^2)))
 
-########################################
-# colsample_bylevel ----
+#b) Colsample_bylevel:
 set.seed(1284654)
 conv_cs = matrix(NA,500,length(cs))
-pred_cs = matrix(NA,nrow(ytest), length(cs))
+pred_cs = matrix(NA,nrow(test), length(cs))
 colnames(conv_cs) = colnames(pred_cs) = cs
 
 for(i in 1:length(cs)){
@@ -701,16 +724,16 @@ for(i in 1:length(cs)){
   pred_cs[,i] = predict(xgb, xtest)
 }
 
+
 conv_cs = data.frame(iter=1:500, conv_cs)
 conv_cs = melt(conv_cs, id.vars = "iter")
 ggplot(data = conv_cs) + geom_line(aes(x = iter, y = value, color = variable))
 (RMSE_cs = sqrt(colMeans((as.numeric(ytest)-pred_cs)^2)))
 
-#######################################
-## Max Depth ----
+#c) Max Depth: 
 set.seed(1284654)
 conv_md=matrix(NA,500,length(md))
-pred_md=matrix(NA,nrow(ytest),length(md))
+pred_md=matrix(NA,nrow(test),length(md))
 colnames(conv_md)=colnames(pred_md)=md
 
 for(i in 1:length(md)){
@@ -727,11 +750,10 @@ conv_md=melt(conv_md,id.vars = "iter")
 ggplot(data=conv_md)+geom_line(aes(x=iter,y=value,color=variable))
 (RMSE_md=sqrt(colMeans((as.numeric(ytest)-pred_md)^2)))
 
-##################################
-## sub_sample ----
-set.seed(1284654)
-conv_ss = matrix(NA,500,length(ss))
-pred_ss = matrix(NA,nrow(ytest),length(ss))
+#d) Sub Sample: 
+set.seed(1)
+conv_ss=matrix(NA,500,length(ss))
+pred_ss=matrix(NA,nrow(test),length(ss))
 colnames(conv_ss)=colnames(pred_ss)=ss
 
 for(i in 1:length(ss)){
@@ -748,11 +770,10 @@ conv_ss=melt(conv_ss,id.vars = "iter")
 ggplot(data=conv_ss)+geom_line(aes(x=iter,y=value,color=variable))
 (RMSE_ss=sqrt(colMeans((as.numeric(ytest)-pred_ss)^2)))
 
-#####################################
-## min_child_weight ----
+#e) min_child weight:
 set.seed(12754)
 conv_mcw = matrix(NA,500,length(mcw))
-pred_mcw = matrix(NA,nrow(ytest), length(mcw))
+pred_mcw = matrix(NA,nrow(test), length(mcw))
 colnames(conv_mcw) = colnames(pred_mcw) = mcw
 
 for(i in 1:length(mcw)){
@@ -769,11 +790,11 @@ conv_mcw = melt(conv_mcw, id.vars = "iter")
 ggplot(data = conv_mcw) + geom_line(aes(x = iter, y = value, color = variable))
 (RMSE_mcw = sqrt(colMeans((as.numeric(ytest)-pred_mcw)^2)))
 
-########################
-### Gamma ----
+
+#f) Gamma: 
 set.seed(12897564)
 conv_gamma = matrix(NA,500,length(gamma))
-pred_gamma = matrix(NA,nrow(ytest), length(gamma))
+pred_gamma = matrix(NA,nrow(test), length(gamma))
 colnames(conv_gamma) = colnames(pred_gamma) = gamma
 
 for(i in 1:length(gamma)){
@@ -790,44 +811,43 @@ conv_gamma = melt(conv_gamma, id.vars = "iter")
 ggplot(data = conv_gamma) + geom_line(aes(x = iter, y = value, color = variable))
 (RMSE_gamma = sqrt(colMeans((as.numeric(ytest)-pred_gamma)^2)))
 
-##############
-## setting the values ----
+
+
+#Setting the values: 
 xgb1 <- xgboost(data = xtrain, label = ytrain,
                 nrounds = 500)
 
-params = list(eta = .01, colsample_bylevel = 1/3,
+
+params = list(eta = .02, colsample_bylevel = 1/3,
               subsample =1 , max_depth = 4,
-              min_child_weigth = 100, gamma = 100)
+              min_child_weigth = 1)
+params
+
 
 xgb.train <- xgboost(data = xtrain, label = ytrain,
                      params = params,
                      nrounds = 500, objective = "reg:squarederror")
 
+
 xgb.test <- xgboost(data = xtest, label = ytest,
                     params = params,
                     nrounds = 500, objective = "reg:squarederror")
 
+
 # run test model
 y_pred <- predict(xgb.train, xtest)
-
 # get MSE
-test.MSE2 <- mean((ytest - y_pred)^2)
-
-(test.MSE2 / test.MSE) *100
-
+test.MSE2<-mean((ytest - y_pred)^2)
+test.MSE2
 # get residual (if continuous outcome)
-r2 <- ytest - y_pred
+r2<-ytest - y_pred
 plot(r2, ylab = "residuals", main = "XGB residuals")
 qqnorm(r2)
 
-### plot
+
+#Plot: 
 #get the first three trees
 xgb.plot.tree(model = xgb.train, trees = 0:2)
-
 xgb.plot.multi.trees(xgb.train)
-
 importance_matrix <- xgb.importance(model = xgb.train)
 xgb.plot.importance(importance_matrix, xlab = "Feature Importance")
-
-y_pred <- ifelse(y_pred > 0.5, 1, 0)
-table(ytest, y_pred)
