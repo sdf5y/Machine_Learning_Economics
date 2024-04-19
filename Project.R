@@ -558,59 +558,48 @@ forward_glm <- step(, direction = "forward", scope = formula(~ .))
 backward_glm <- step(, direction = "backward", scope = formula(~ .))  
 step_glm <- step(, direction = "both", scope = formula(~ .)) 
 
-#lasso ----
+#Lasso ----
 library(glmnet)
 
-grid <- 10^seq(10, -2, length = 100)
+X <- model.matrix(q9_2$relief ~., data = q9_2)[, -1]  # Predictors
+Y <- q9_2$relief
 
-lasso.glm <- glmnet(train[,-10], train$relief, alpha = 1,
-                    lambda = grid)
+#Lasso logistic regression model with 10-fold cross-validation
+logit_model <- cv.glmnet(X, Y, alpha = 1, family = "binomial", link = "logit", nfolds = 10, newx = X)
 
-matrix(train[,])
-# plots coefficients versus normalization.
-plot(lasso.glm)
-set.seed(186243)
 
-# alpha=1 chooses a lasso model in glmnet. ridge regresssion is aplpha=0.
-cv.out <- cv.glmnet(train[,-10], train$relief, alpha = 1)
-?cv.glmnet
-cv.out$lambda.min
+coef(logit_model, s = "lambda.min")
 
-## plot best value of lambda will be between the dotted lines.
-plot(cv.out)
-bestlam.lasso <- cv.out$lambda.min
-lasso.pred <- predict(lasso.glm , s = bestlam.lasso ,
-                      newx = x[test , ])
-mean((lasso.pred - y.test)^2)
-
-#regression tree----
-### tree
-
-intrain <- createDataPartition(y = q9_s$relief, p= 0.7)[[1]]
-train_debt <- q9_s[intrain,]
-test_debt <- q9_s[-intrain,]
+#Regression tree ------
+intrain <- createDataPartition(y = q9_s$relief, p= 0.8)[[1]]
+train_q9_s <- q9_s[intrain,]
+test_q9_s <- q9_s[-intrain,]
 
 library(rpart)
-#install.packages('rpart.plot')
 library(rpart.plot)
-### Rpart tree parameters, defualts below.
-## Rpart uses K fold automatically to determine
-# cost complexity parameter cp
-## minsplit is the min # of obs for a split attempt.
-## minbucket is the min # obs in a terminal node
-## xval= is the number of CVs
-rpart.control(minsplit = 20, minbucket = round(minsplit/3), cp = 0.01,
+
+minsplit <- 20
+
+rpart.control_params <- rpart.control(minsplit = 20, minbucket = round(minsplit/3), cp = 0.00001,
               maxcompete = 4, maxsurrogate = 5, usesurrogate = 2, xval = 10,
               surrogatestyle = 0, maxdepth = 30)
 
-debt.tree <- rpart(relief ~ ., data= train, method = "anova")
+relief.tree <- rpart(relief~., data= train_q9_s, control = rpart.control_params, method = "class")
 
-summary(debt.tree)
+summary(relief.tree)
 
-rpart.plot(debt.tree)
+rpart.plot(relief.tree)
 
-debt.tree$variable.importance
+relief.tree$variable.importance
 
+#Predictions
+predicted_labels <- predict(relief.tree, newdata = test_q9_s, type = "class")
+
+#misclassification rate
+misclassification_rate <- mean(predicted_labels != test_q9_s$relief)
+
+print(misclassification_rate
+      
 ############ Random Forest #####################
 set.seed(275142)
 RF<- randomForest(relief~., data= train,
