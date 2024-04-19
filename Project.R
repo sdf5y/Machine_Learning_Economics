@@ -24,14 +24,14 @@ library(wesanderson)
 library(zipcodeR)
 #install.packages('stringr')
 library(stringr)
+library(glmnet)
 
 #Loading The Data----
 
-group3 <- read_csv("group3.csv")
-group3 <- group3[-1] #inefficient, but works
+group3 <- read_csv("group3.csv", col_types = cols(...1 = col_skip()))
 
-fips_data <- read_csv("zip_fips.csv")
-fips_data <- fips_data[-1]#inefficient, but works
+fips_data <- read_csv("zip_fips.csv", col_types = cols(...1 = col_skip(), 
+                                                       STCOUNTYFP = col_number()))
 
 countydebt <- read_excel("dia_lbls_all_overall_county_2022_02_14Sep2023.xlsx")
 
@@ -56,8 +56,6 @@ ctfips <-  (ifelse((fips_data$STATE == 'CT' & str_detect(fips_data$STCOUNTYFP, "
        as.numeric(paste0("01", fips_data$STCOUNTYFP)), fips_data$STCOUNTYFP))
 
 fips_data$STCOUNTYFP <- ctfips
-
-#countydebt <- countydebt[,-c(4, 7, 10, 13, 16, 19, 22, 26)]
 
 countydebt$`County FIPS` <- as.numeric(countydebt$`County FIPS`)
 
@@ -117,12 +115,10 @@ group3$Date.received <- as.Date(group3$Date.received, format = "%m/%d/%y")
 
 group3$Dispute_prior <- ifelse(group3$Date.received  > as.Date('04/24/17', format= "%m/%d/%y"), 1,0)
 
-unique(group3$Company.response.to.consumer)
-
-#Zip Code Cleaning -----
+#####Zip Code Cleaning#### -----
 USA_zippop <- zip_code_db
 
-#clean fips data first ----
+#Clean Zip Reference data first ----
 
 fips_data$ZIP <- as.character(fips_data$ZIP)
 group3$ZIP.code <- as.character(group3$ZIP.code)
@@ -156,7 +152,7 @@ error_zip <- fips_data[nchar(fips_data$ZIP) < 5, ]
 #manual fix 
 fips_data$ZIP[fips_data$ZIP == error_zip$ZIP] <- '00501'
 
-#Group3 fix zips -----
+#Group3 Clean Zips -----
 
 #check zips including numbers
 table(str_detect( as.character(group3$ZIP.code), "[0-9]+$")) #looks like they're all numbers
@@ -174,22 +170,18 @@ zip_binary_map <- unique_zips %in% fips_data$ZIP
 
 table(zip_binary_map)
 
-error_zips <- unique_zips[!zip_binary_map] #45 erroneous zips
+error_zips <- unique_zips[!zip_binary_map] #erroneous zips
 
 #T.test of error zips -----
 t.test(table(zip_binary_map), alternative = 'two.sided') #fail to reject the null - the error zips are not significant at 5% level
-
-#replace military states with nearest, largest port state
-#group3$State <- replace(group3$State, group3$State %in% c('AE', 'AP'), c('NY', 'CA'))
 
 for (error_state in unique(group3$State[group3$ZIP.code %in% error_zips])) {
   mode_zip <- names(sort(table(group3$ZIP.code[group3$State == error_state]), decreasing = TRUE)[1])
   group3$ZIP.code[group3$ZIP.code %in% error_zips & group3$State == error_state] <- mode_zip
 }
 
-#LEADING Zero Code replacement 
-#Place a leading zero for the problem zips
-zip <- as.character(group3$ZIP.code[zip_binary_map == FALSE])
+#LEADING Zero Code replacement for the problem zips
+#zip <- as.character(group3$ZIP.code[zip_binary_map == FALSE])
 #for(i in 1:length(zip)){
 #  if(nchar(as.numeric(zip[i])) < 5){
 #    zip[i] <- paste0("0", zip[i])
@@ -204,9 +196,6 @@ zip <- as.character(group3$ZIP.code[zip_binary_map == FALSE])
 error_zips <- unique_zips[!zip_binary_map] #82 erroneous zips
 table(zip_binary_map)
 
-#replace military states with nearest, largest port state
-#group3$State <- replace(group3$State, group3$State %in% c('AE', 'AP'), c('VA', 'CA'))
-
 for (error_state in unique(group3$State[group3$ZIP.code %in% error_zips])) {
   mode_zip <- names(sort(table(group3$ZIP.code[group3$State == error_state]), decreasing = TRUE)[1])
   group3$ZIP.code[group3$ZIP.code %in% error_zips & group3$State == error_state] <- mode_zip
@@ -217,7 +206,26 @@ unique_zips <- unique(group3$ZIP.code)
 zip_binary_map <- unique_zips %in% fips_data$ZIP
 table(zip_binary_map) #looks like there are no issues anymore 
 
-#rm(i, zip, zip_binary_map, zip_binary_map_1, unique_zips, unclean_zips) #remove these variables when done.
+#rm(i, zip, zip_binary_map, unique_zips, unclean_zips) #remove these variables when done.
+
+#FIPS Fix ------
+
+state_data <- data.frame(
+  Postal_Abbr = c(
+    "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", 
+    "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", 
+    "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"
+  ),
+  FIPS_Code = c(
+    "0", "0", "0", "0", "0", "0", "0", "10", "12", "13", "15", "16", "17", "18", "19", "20", "21", "22", "23", 
+    "24", "25", "26", "27", "28", "29", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42",  
+    "44", "45", "46", "47", "48", "49", "50", "51", "53", "54", "55", "56"
+  )
+)
+
+countydebt$`County FIPS` <- as.character(paste0("0", countydebt$`County FIPS`))
+
+fips_data$STCOUNTYFP <- as.character(paste0("0", fips_data$STCOUNTYFP))
 
 #Q3 ----
 
@@ -344,6 +352,8 @@ county_demos <- cbind(county_demos, combined_results4)
 county_demos$TotalMale <- county_totals$TOM_MALE
 county_demos$TotalFemale <- county_totals$TOT_FEMALE
 
+county_demos$Fips <- as.character(paste0("0", county_demos$Fips))
+
 #Q6-----
 
 #matching fips to zips
@@ -352,7 +362,7 @@ merg_county_demos <- merge(county_demos, fips_data, by.x = 'Fips', by.y = "STCOU
 clean_group3 <- left_join(group3, merg_county_demos, by = c('ZIP.code' = 'ZIP'))
 
 clean_group3$Fips <- as.character(clean_group3$Fips)
-countydebt$`County FIPS` <- as.character(countydebt$`County FIPS`)
+
 hopefully_all <- left_join(clean_group3, countydebt, by = c('Fips' = 'County FIPS'))
 
 #making csvs to save time in cleanup 
@@ -444,8 +454,6 @@ ca$medicaldebt <- as.factor(ifelse(ca$Sub.product == "Medical debt", 1,0))
 
 count(is.na(ca))
 
-#ca <- ca %>%  filter(complete.cases(.))
-
 # 2 cluster
 kpres2 <- kproto(x=ca[,c(2:7)], k=2, na.rm = 'imp.internal')
 
@@ -483,18 +491,13 @@ library(lubridate)
 q9$Year <- year(q9$Date.received)
 
 q9 <- q9 %>%
-  select(Sub.product, Issue, Sub.issue, State, ZIP.code, Tags, Consumer.consent.provided., Submitted.via, Timely.response. , relief, drop, 
+  select(Sub.product, Issue, Sub.issue, State, ZIP.code, Consumer.consent.provided., Submitted.via, Timely.response. , relief, drop, 
   Dispute_prior, servicemenber, olderAm, 
   Fips, Pop_less25, Pop_over64, Pop_Hispanic, w_total, b_total, a_total, combo_native_total, TotalMale, TotalFemale,
   Share.of.people.of.color, Average.household.income..All, Average.household.income..Comm.of.color, Average.household.income..White.comm,
  Comp.1, Comp.2,Comp.3, Comp.4, MedicalDebtClusters,  Year)
 
 table(q9$Year) #we are dropping the variables below the year 2024
-
-#q9_2 <- subset(q9, Year == 2024)
-write.csv(q9, "q9.csv")
-
-#q9_2 <- q9_2[,-37] #dropping year variable
 
 #Transformations -------
 
@@ -505,22 +508,27 @@ q9_s <- data.frame(
   })
 )
 
-logged_vs <- log(q9_s[,c(16:28)])
+logged_vs <- log(q9_s[,c(15:27)])
 lognames <- colnames(logged_vs)
 lognames <- paste("log", lognames)
 colnames(logged_vs) <- lognames
 
-squared_vs <- q9_s[,c(16:28)]^2
+squared_vs <- q9_s[,c(15:27)]^2
 sqnames <- colnames(squared_vs)
 sqnames <- paste("sq", sqnames)
 colnames(squared_vs) <- sqnames
 
-standardized_vs <- scale(q9_s[,c(16:28)])
+standardized_vs <- scale(q9_s[,c(15:27)])
 stan_names <- colnames(standardized_vs)
 stan_names <- paste("stan", stan_names)
 colnames(standardized_vs) <- stan_names
 
 q9_s <- cbind(q9_s, logged_vs, squared_vs, standardized_vs)
+
+q9_s <- q9_s %>%
+  filter(complete.cases(.))
+
+write.csv(q9_s, "q9_s.csv")
 
 ##### train and test ------
 library(caret)
@@ -528,7 +536,7 @@ train_control <- trainControl(method = "cv",
                               number = 10) 
 
 library(caTools)
-set.seed(27514234556432)
+set.seed(275142345)
 split <- sample.split(q9_s, SplitRatio = 0.7)
 train <- subset(q9_s, split == "TRUE")
 test <- subset(q9_s, split == "FALSE")
@@ -536,7 +544,7 @@ test <- subset(q9_s, split == "FALSE")
 #Q10-----
 
 #logit----
-logit_m <- glm(relief ~ ., data = train)
+logit_m <- glm(relief ~ (`log Share.of.people.of.color`), data = train)
 
 plot(logit_m)
 
@@ -546,71 +554,84 @@ model <- train(relief ~ Share.of.people.of.color, data = q9_s,
                method = "glm", 
                trControl = train_control)
 
-forward_glm <- step(glm1.5, direction = "forward", scope = formula(~ .))
-backward_glm <- step(glm1.5, direction = "backward", scope = formula(~ .))  
-step_glm <- step(glm1.5, direction = "both", scope = formula(~ .)) 
+forward_glm <- step(, direction = "forward", scope = formula(~ .))
+backward_glm <- step(, direction = "backward", scope = formula(~ .))  
+step_glm <- step(, direction = "both", scope = formula(~ .)) 
 
 #lasso ----
 library(glmnet)
 
-X <- model.matrix(q9_2$relief ~., data = q9_2)[, -1]  # Predictors
-Y <- q9_2$relief
+grid <- 10^seq(10, -2, length = 100)
 
-#Lasso logistic regression model with 10-fold cross-validation
-logit_model <- cv.glmnet(X, Y, alpha = 1, family = "binomial", link = "logit", nfolds = 10, newx = X)
+lasso.glm <- glmnet(train[,-10], train$relief, alpha = 1,
+                    lambda = grid)
 
-coef(logit_model, s = "lambda.min")
+matrix(train[,])
+# plots coefficients versus normalization.
+plot(lasso.glm)
+set.seed(186243)
+
+# alpha=1 chooses a lasso model in glmnet. ridge regresssion is aplpha=0.
+cv.out <- cv.glmnet(train[,-10], train$relief, alpha = 1)
+?cv.glmnet
+cv.out$lambda.min
+
+## plot best value of lambda will be between the dotted lines.
+plot(cv.out)
+bestlam.lasso <- cv.out$lambda.min
+lasso.pred <- predict(lasso.glm , s = bestlam.lasso ,
+                      newx = x[test , ])
+mean((lasso.pred - y.test)^2)
 
 #regression tree----
 ### tree
-intrain <- createDataPartition(y = q9_s$relief, p= 0.8)[[1]]
-train_q9_s <- q9_s[intrain,]
-test_q9_s <- q9_s[-intrain,]
+
+intrain <- createDataPartition(y = q9_s$relief, p= 0.7)[[1]]
+train_debt <- q9_s[intrain,]
+test_debt <- q9_s[-intrain,]
 
 library(rpart)
+#install.packages('rpart.plot')
 library(rpart.plot)
-
-minsplit <- 20
-
-rpart.control_params <- rpart.control(minsplit = 20, minbucket = round(minsplit/3), cp = 0.00001,
+### Rpart tree parameters, defualts below.
+## Rpart uses K fold automatically to determine
+# cost complexity parameter cp
+## minsplit is the min # of obs for a split attempt.
+## minbucket is the min # obs in a terminal node
+## xval= is the number of CVs
+rpart.control(minsplit = 20, minbucket = round(minsplit/3), cp = 0.01,
               maxcompete = 4, maxsurrogate = 5, usesurrogate = 2, xval = 10,
               surrogatestyle = 0, maxdepth = 30)
 
-relief.tree <- rpart(relief~., data= train_q9_s, control = rpart.control_params, method = "class")
+debt.tree <- rpart(relief ~ ., data= train, method = "anova")
 
-summary(relief.tree)
+summary(debt.tree)
 
-rpart.plot(relief.tree)
+rpart.plot(debt.tree)
 
-relief.tree$variable.importance
+debt.tree$variable.importance
 
-# Make predictions using the trained model
-predicted_labels <- predict(relief.tree, newdata = test_q9_s, type = "class")
+#Random Forest-----
+library(randomForest)
+#install.packages('randomForestExplainer')
+library(randomForestExplainer)
+set.seed(982465)
 
-# Calculate misclassification rate
-misclassification_rate <- mean(predicted_labels != test_q9_s$relief)
-
-# Print the misclassification rate
-print(misclassification_rate
-      
-#Random Forest:
-#Fitting Random forest to the train data: 
-set.seed(275142)
-RF<- randomForest(relief~., data= train,
+##### Full data set for OOB
+uber.rf.mean <- randomForest(Uber~., data= trip1.1,
                              importance=TRUE, ntree=500)
+uber.rf.mean
+plot(uber.rf.mean)
 
-RF
-plot(RF)
+## variable importance
+uber.rf.mean$importance
 
-#Checking at importance: 
-RF$importance
-
-#Importance frame: 
-importance_frame <- measure_importance(RF)
+## Other importance variables
+importance_frame <- measure_importance(uber.rf.mean)
 importance_frame
 
 ### plot variable depth
-min_depth_frame<- min_depth_distribution(RF)
+min_depth_frame <- min_depth_distribution(uber.rf.mean)
 head(min_depth_frame, n = 10)
 plot_min_depth_distribution(min_depth_frame)
 
@@ -621,40 +642,14 @@ plot_multi_way_importance(importance_frame, size_measure = "no_of_nodes")
 ## pick 5 most important variables
 (vars <- important_variables(importance_frame, k = 5, measures =
                                c("mean_min_depth", "no_of_trees")))
-interactions_frame <- min_depth_interactions(RF, vars)
+interactions_frame <- min_depth_interactions(bnb.rf.mean, vars)
 head(interactions_frame[order(interactions_frame$occurrences, decreasing = TRUE), ])
 plot_min_depth_interactions(interactions_frame)
 
-#XG Boost:
-split.imp <- sample.split(train, SplitRatio = 0.7)
-train1 <-  subset(q9_clean, split.imp == "TRUE")
-test1 <- subset(q9_clean, split.imp == "FALSE")
-
-# make them numeric matrix
-xtrain<-sparse.model.matrix(relief ~. -1, data = train1)
-ytrain <- as.array(train1$relief)
-xtest <- sparse.model.matrix(relief ~ .-1, data = test1)
-ytest <- as.array(test1$relief)
-
-### run train model
-xgb1 <- xgboost(data = xtrain, label = ytrain,
-                nrounds = 100)
-
-# run test model
-y_pred <- predict(xgb1, xtest)
-# get MSE
-test.MSE<-mean((ytest - y_pred)^2)
-test.MSE
-# get residual (if continuous outcome)
-r<-ytest - y_pred
-qqnorm(r)
-
-### plot
-### plot
-xgb.plot.multi.trees(xgb1)
-
-
-#eta:
+#Gradient Boosting/ XGBoost------
+### Grid serching hyperparameter values
+# = parameters = #
+# = eta candidates = #
 eta=c(0.05, 0.1, 0.2,0.5,1)
 
 # = colsample_bylevel candidates = #
@@ -675,7 +670,7 @@ mcw=c(1,10,100,400)
 # = gamma candidates = #
 gamma=c(0.1,1,10,100)
 
-#a) ETA search:
+### Eta search -----
 set.seed(13856)
 conv_eta = matrix(NA,500,length(eta))
 pred_eta = matrix(NA,nrow(ytest), length(eta))
@@ -690,16 +685,16 @@ for(i in 1:length(eta)){
   pred_eta[,i] = predict(xgb, xtest)
 }
 
-
 conv_eta = data.frame(iter=1:500, conv_eta)
 conv_eta = melt(conv_eta, id.vars = "iter")
 ggplot(data = conv_eta) + geom_line(aes(x = iter, y = value, color = variable))
 (RMSE_eta = sqrt(colMeans((as.numeric(ytest)-pred_eta)^2)))
 
-#b) Colsample_bylevel:
+########################################
+# colsample_bylevel ----
 set.seed(1284654)
 conv_cs = matrix(NA,500,length(cs))
-pred_cs = matrix(NA,nrow(test), length(cs))
+pred_cs = matrix(NA,nrow(ytest), length(cs))
 colnames(conv_cs) = colnames(pred_cs) = cs
 
 for(i in 1:length(cs)){
@@ -711,16 +706,16 @@ for(i in 1:length(cs)){
   pred_cs[,i] = predict(xgb, xtest)
 }
 
-
 conv_cs = data.frame(iter=1:500, conv_cs)
 conv_cs = melt(conv_cs, id.vars = "iter")
 ggplot(data = conv_cs) + geom_line(aes(x = iter, y = value, color = variable))
 (RMSE_cs = sqrt(colMeans((as.numeric(ytest)-pred_cs)^2)))
 
-#c) Max Depth: 
+#######################################
+## Max Depth ----
 set.seed(1284654)
 conv_md=matrix(NA,500,length(md))
-pred_md=matrix(NA,nrow(test),length(md))
+pred_md=matrix(NA,nrow(ytest),length(md))
 colnames(conv_md)=colnames(pred_md)=md
 
 for(i in 1:length(md)){
@@ -737,10 +732,11 @@ conv_md=melt(conv_md,id.vars = "iter")
 ggplot(data=conv_md)+geom_line(aes(x=iter,y=value,color=variable))
 (RMSE_md=sqrt(colMeans((as.numeric(ytest)-pred_md)^2)))
 
-#d) Sub Sample: 
-set.seed(1)
-conv_ss=matrix(NA,500,length(ss))
-pred_ss=matrix(NA,nrow(test),length(ss))
+##################################
+## sub_sample ----
+set.seed(1284654)
+conv_ss = matrix(NA,500,length(ss))
+pred_ss = matrix(NA,nrow(ytest),length(ss))
 colnames(conv_ss)=colnames(pred_ss)=ss
 
 for(i in 1:length(ss)){
@@ -757,10 +753,11 @@ conv_ss=melt(conv_ss,id.vars = "iter")
 ggplot(data=conv_ss)+geom_line(aes(x=iter,y=value,color=variable))
 (RMSE_ss=sqrt(colMeans((as.numeric(ytest)-pred_ss)^2)))
 
-#e) min_child weight:
+#####################################
+## min_child_weight ----
 set.seed(12754)
 conv_mcw = matrix(NA,500,length(mcw))
-pred_mcw = matrix(NA,nrow(test), length(mcw))
+pred_mcw = matrix(NA,nrow(ytest), length(mcw))
 colnames(conv_mcw) = colnames(pred_mcw) = mcw
 
 for(i in 1:length(mcw)){
@@ -777,11 +774,11 @@ conv_mcw = melt(conv_mcw, id.vars = "iter")
 ggplot(data = conv_mcw) + geom_line(aes(x = iter, y = value, color = variable))
 (RMSE_mcw = sqrt(colMeans((as.numeric(ytest)-pred_mcw)^2)))
 
-
-#f) Gamma: 
+########################
+### Gamma ----
 set.seed(12897564)
 conv_gamma = matrix(NA,500,length(gamma))
-pred_gamma = matrix(NA,nrow(test), length(gamma))
+pred_gamma = matrix(NA,nrow(ytest), length(gamma))
 colnames(conv_gamma) = colnames(pred_gamma) = gamma
 
 for(i in 1:length(gamma)){
@@ -798,43 +795,44 @@ conv_gamma = melt(conv_gamma, id.vars = "iter")
 ggplot(data = conv_gamma) + geom_line(aes(x = iter, y = value, color = variable))
 (RMSE_gamma = sqrt(colMeans((as.numeric(ytest)-pred_gamma)^2)))
 
-
-
-#Setting the values: 
+##############
+## setting the values ----
 xgb1 <- xgboost(data = xtrain, label = ytrain,
                 nrounds = 500)
 
-
-params = list(eta = .02, colsample_bylevel = 1/3,
+params = list(eta = .01, colsample_bylevel = 1/3,
               subsample =1 , max_depth = 4,
-              min_child_weigth = 1)
-params
-
+              min_child_weigth = 100, gamma = 100)
 
 xgb.train <- xgboost(data = xtrain, label = ytrain,
                      params = params,
                      nrounds = 500, objective = "reg:squarederror")
 
-
 xgb.test <- xgboost(data = xtest, label = ytest,
                     params = params,
                     nrounds = 500, objective = "reg:squarederror")
 
-
 # run test model
 y_pred <- predict(xgb.train, xtest)
+
 # get MSE
-test.MSE2<-mean((ytest - y_pred)^2)
-test.MSE2
+test.MSE2 <- mean((ytest - y_pred)^2)
+
+(test.MSE2 / test.MSE) *100
+
 # get residual (if continuous outcome)
-r2<-ytest - y_pred
+r2 <- ytest - y_pred
 plot(r2, ylab = "residuals", main = "XGB residuals")
 qqnorm(r2)
 
-
-#Plot: 
+### plot
 #get the first three trees
 xgb.plot.tree(model = xgb.train, trees = 0:2)
+
 xgb.plot.multi.trees(xgb.train)
+
 importance_matrix <- xgb.importance(model = xgb.train)
 xgb.plot.importance(importance_matrix, xlab = "Feature Importance")
+
+y_pred <- ifelse(y_pred > 0.5, 1, 0)
+table(ytest, y_pred)
