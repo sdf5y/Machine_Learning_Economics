@@ -632,9 +632,9 @@ head(interactions_frame[order(interactions_frame$occurrences, decreasing = TRUE)
 plot_min_depth_interactions(interactions_frame)
 
 ########################### XG Boost #############################
-split.imp <- sample.split(train, SplitRatio = 0.7)
-train1 <-  subset(q9_clean, split.imp == "TRUE")
-test1 <- subset(q9_clean, split.imp == "FALSE")
+split.imp <- sample.split(q9_s, SplitRatio = 0.7)
+train1 <-  subset(q9_s, split.imp == "TRUE")
+test1 <- subset(q9_s, split.imp == "FALSE")
 
 # make them numeric matrix
 xtrain<-sparse.model.matrix(relief ~. -1, data = train1)
