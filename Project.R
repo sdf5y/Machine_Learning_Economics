@@ -491,7 +491,7 @@ library(lubridate)
 q9$Year <- year(q9$Date.received)
 
 q9 <- q9 %>%
-  select(Sub.product, Issue, Sub.issue, State, ZIP.code, Consumer.consent.provided., Submitted.via, Timely.response. , relief, drop, 
+  select(Sub.product, Issue, Sub.issue, Consumer.consent.provided., Submitted.via, Timely.response. , relief, drop, 
   Dispute_prior, servicemenber, olderAm, 
   Fips, Pop_less25, Pop_over64, Pop_Hispanic, w_total, b_total, a_total, combo_native_total, TotalMale, TotalFemale,
   Share.of.people.of.color, Average.household.income..All, Average.household.income..Comm.of.color, Average.household.income..White.comm,
