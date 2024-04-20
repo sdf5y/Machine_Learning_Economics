@@ -632,6 +632,7 @@ head(interactions_frame[order(interactions_frame$occurrences, decreasing = TRUE)
 plot_min_depth_interactions(interactions_frame)
 
 ########################### XG Boost #############################
+set.seed(27514)
 split.imp <- sample.split(q9_s, SplitRatio = 0.7)
 train1 <-  subset(q9_s, split.imp == "TRUE")
 test1 <- subset(q9_s, split.imp == "FALSE")
@@ -644,10 +645,11 @@ ytest <- as.array(test1$relief)
 
 ### run train model
 xgb1 <- xgboost(data = xtrain, label = ytrain,
-                nrounds = 100)
+                nrounds = 500)
 
 # run test model
 y_pred <- predict(xgb1, xtest)
+y_pred
 # get MSE
 test.MSE<-mean((ytest - y_pred)^2)
 test.MSE
@@ -656,10 +658,9 @@ r<-ytest - y_pred
 qqnorm(r)
 
 ### plot
-### plot
 xgb.plot.multi.trees(xgb1)
 
-
+#Various different hyperparameters:
 #eta:
 eta=c(0.05, 0.1, 0.2,0.5,1)
 
@@ -684,7 +685,7 @@ gamma=c(0.1,1,10,100)
 #a) ETA search:
 set.seed(13856)
 conv_eta = matrix(NA,500,length(eta))
-pred_eta = matrix(NA,nrow(ytest), length(eta))
+pred_eta = matrix(NA,nrow(test1), length(eta))
 colnames(conv_eta) = colnames(pred_eta) = eta
 
 for(i in 1:length(eta)){
@@ -705,7 +706,7 @@ ggplot(data = conv_eta) + geom_line(aes(x = iter, y = value, color = variable))
 #b) Colsample_bylevel:
 set.seed(1284654)
 conv_cs = matrix(NA,500,length(cs))
-pred_cs = matrix(NA,nrow(test), length(cs))
+pred_cs = matrix(NA,nrow(test1), length(cs))
 colnames(conv_cs) = colnames(pred_cs) = cs
 
 for(i in 1:length(cs)){
@@ -726,7 +727,7 @@ ggplot(data = conv_cs) + geom_line(aes(x = iter, y = value, color = variable))
 #c) Max Depth: 
 set.seed(1284654)
 conv_md=matrix(NA,500,length(md))
-pred_md=matrix(NA,nrow(test),length(md))
+pred_md=matrix(NA,nrow(test1),length(md))
 colnames(conv_md)=colnames(pred_md)=md
 
 for(i in 1:length(md)){
@@ -746,7 +747,7 @@ ggplot(data=conv_md)+geom_line(aes(x=iter,y=value,color=variable))
 #d) Sub Sample: 
 set.seed(1)
 conv_ss=matrix(NA,500,length(ss))
-pred_ss=matrix(NA,nrow(test),length(ss))
+pred_ss=matrix(NA,nrow(test1),length(ss))
 colnames(conv_ss)=colnames(pred_ss)=ss
 
 for(i in 1:length(ss)){
@@ -766,7 +767,7 @@ ggplot(data=conv_ss)+geom_line(aes(x=iter,y=value,color=variable))
 #e) min_child weight:
 set.seed(12754)
 conv_mcw = matrix(NA,500,length(mcw))
-pred_mcw = matrix(NA,nrow(test), length(mcw))
+pred_mcw = matrix(NA,nrow(test1), length(mcw))
 colnames(conv_mcw) = colnames(pred_mcw) = mcw
 
 for(i in 1:length(mcw)){
@@ -787,7 +788,7 @@ ggplot(data = conv_mcw) + geom_line(aes(x = iter, y = value, color = variable))
 #f) Gamma: 
 set.seed(12897564)
 conv_gamma = matrix(NA,500,length(gamma))
-pred_gamma = matrix(NA,nrow(test), length(gamma))
+pred_gamma = matrix(NA,nrow(test1), length(gamma))
 colnames(conv_gamma) = colnames(pred_gamma) = gamma
 
 for(i in 1:length(gamma)){
@@ -844,4 +845,3 @@ xgb.plot.tree(model = xgb.train, trees = 0:2)
 xgb.plot.multi.trees(xgb.train)
 importance_matrix <- xgb.importance(model = xgb.train)
 xgb.plot.importance(importance_matrix, xlab = "Feature Importance")
-
