@@ -508,17 +508,17 @@ q9_s <- data.frame(
   })
 )
 
-logged_vs <- log(q9_s[,c(15:27)])
+logged_vs <- log(q9_s[,c(15:25)])
 lognames <- colnames(logged_vs)
 lognames <- paste("log", lognames)
 colnames(logged_vs) <- lognames
 
-squared_vs <- q9_s[,c(15:27)]^2
+squared_vs <- q9_s[,c(15:25)]^2
 sqnames <- colnames(squared_vs)
 sqnames <- paste("sq", sqnames)
 colnames(squared_vs) <- sqnames
 
-standardized_vs <- scale(q9_s[,c(15:27)])
+standardized_vs <- scale(q9_s[,c(15:25)])
 stan_names <- colnames(standardized_vs)
 stan_names <- paste("stan", stan_names)
 colnames(standardized_vs) <- stan_names
