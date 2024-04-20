@@ -600,13 +600,12 @@ misclassification_rate <- mean(predicted_labels != test_q9_s$relief)
 
 print(misclassification_rate
       
-############ Random Forest #####################
+######################################### Random forest ###############################################
 set.seed(275142)
-RF<- randomForest(relief~., data= train,
+RF<- randomForest(relief~., data= q9_s,
                              importance=TRUE, ntree=500)
 
 RF
-plot(RF)
 
 #Checking at importance: 
 RF$importance
@@ -631,7 +630,7 @@ interactions_frame <- min_depth_interactions(RF, vars)
 head(interactions_frame[order(interactions_frame$occurrences, decreasing = TRUE), ])
 plot_min_depth_interactions(interactions_frame)
 
-########################### XG Boost #############################
+################################################ XG Boost #######################################################
 set.seed(27514)
 split.imp <- sample.split(q9_s, SplitRatio = 0.7)
 train1 <-  subset(q9_s, split.imp == "TRUE")
@@ -763,6 +762,8 @@ conv_ss=data.frame(iter=1:500,conv_ss)
 conv_ss=melt(conv_ss,id.vars = "iter")
 ggplot(data=conv_ss)+geom_line(aes(x=iter,y=value,color=variable))
 (RMSE_ss=sqrt(colMeans((as.numeric(ytest)-pred_ss)^2)))
+#We plan on proceeding with 0.75 because there isn't significant difference between the RMSE value of 
+#0.75 and 1. Secondly, we use 0.75 to account for any possible outliers. 
 
 #e) min_child weight:
 set.seed(12754)
@@ -783,6 +784,7 @@ conv_mcw = data.frame(iter=1:500, conv_mcw)
 conv_mcw = melt(conv_mcw, id.vars = "iter")
 ggplot(data = conv_mcw) + geom_line(aes(x = iter, y = value, color = variable))
 (RMSE_mcw = sqrt(colMeans((as.numeric(ytest)-pred_mcw)^2)))
+#we select the hyperparameter = 100 because of the same reason as above. 
 
 
 #f) Gamma: 
@@ -811,10 +813,10 @@ ggplot(data = conv_gamma) + geom_line(aes(x = iter, y = value, color = variable)
 xgb1 <- xgboost(data = xtrain, label = ytrain,
                 nrounds = 500)
 
-
-params = list(eta = .02, colsample_bylevel = 1/3,
-              subsample =1 , max_depth = 4,
-              min_child_weigth = 1)
+#set these values manually by looking at RMSE values:
+params = list(eta = .05, colsample_bylevel = 1/3,
+              subsample = 0.75 , max_depth = 2,
+              min_child_weigth = 100)
 params
 
 
@@ -841,7 +843,246 @@ qqnorm(r2)
 
 #Plot: 
 #get the first three trees
-xgb.plot.tree(model = xgb.train, trees = 0:2)
+xgb.plot.tree(model = xgb.train, trees = 0:4)
 xgb.plot.multi.trees(xgb.train)
 importance_matrix <- xgb.importance(model = xgb.train)
+importance_matrix
 xgb.plot.importance(importance_matrix, xlab = "Feature Importance")
+
+
+#################################### XG Boost without olderAM variable ##############################################
+
+#Dropping the 'older american variable, i.e., olderAM' and re-running the XG BOOST: 
+attach(q9_s)
+
+#Dropping the olderAM variable: 
+q9_s1<-q9_s%>%
+  select(-olderAm)
+view(q9_s1)
+
+#Following is the XG boost code:      
+
+################################### XG Boost 1 #####################################################
+#convert all character columns to factor
+q9_s1<- data.frame(
+  lapply(q9_s1, function(x) {
+    if(is.character(x)) factor(x) else x
+  })
+)
+set.seed(27514)
+split.imp1 <- sample.split(q9_s1, SplitRatio = 0.7)
+train2 <-  subset(q9_s1, split.imp == "TRUE")
+test2 <- subset(q9_s1, split.imp == "FALSE")
+
+# make them numeric matrix
+xtrain1<-sparse.model.matrix(relief ~. -1, data = train2)
+ytrain1<- as.array(train2$relief)
+xtest1<- sparse.model.matrix(relief ~ .-1, data = test2)
+ytest1<- as.array(test2$relief)
+
+### run train model
+xgb2<- xgboost(data = xtrain1, label = ytrain1,
+                nrounds = 500)
+
+# run test model
+y_pred1<- predict(xgb2, xtest1)
+y_pred1
+# get MSE
+test.MSE1<-mean((ytest1 - y_pred1)^2)
+test.MSE1
+# get residual (if continuous outcome)
+r1<-ytest1 - y_pred1
+qqnorm(r1)
+
+### plot
+xgb.plot.multi.trees(xgb2)
+
+#Various different hyperparameters:
+#eta:
+eta=c(0.05, 0.1, 0.2,0.5,1)
+
+# = colsample_bylevel candidates = #
+cs=c(1/3,2/3,1)
+
+# = max_depth candidates = #
+md=c(2,4,6,10)
+
+# = sub_sample candidates = #
+ss=c(0.25,0.5,0.75,1)
+
+# = standard model is the second value of each vector above = #
+standard=c(2,2,3,2)
+
+# = min_child_weights candidates = #
+mcw=c(1,10,100,400)
+
+# = gamma candidates = #
+gamma=c(0.1,1,10,100)
+
+#a) ETA search:
+set.seed(13856)
+conv_eta1 = matrix(NA,500,length(eta))
+pred_eta1 = matrix(NA,nrow(test2), length(eta))
+colnames(conv_eta1) = colnames(pred_eta1) = eta
+
+for(i in 1:length(eta)){
+  params=list(eta = eta[i], colsample_bylevel=cs[standard[2]],
+              subsample = ss[standard[4]], max_depth = md[standard[3]],
+              min_child_weigth = 1)
+  xgb=xgboost(xtrain1, label = ytrain1, nrounds = 500, params = params)
+  conv_eta1[,i] = xgb$evaluation_log$train_rmse
+  pred_eta1[,i] = predict(xgb, xtest1)
+}
+
+
+conv_eta1 = data.frame(iter=1:500, conv_eta1)
+conv_eta1 = melt(conv_eta1, id.vars = "iter")
+ggplot(data = conv_eta1) + geom_line(aes(x = iter, y = value, color = variable))
+(RMSE_eta1 = sqrt(colMeans((as.numeric(ytest1)-pred_eta1)^2)))
+
+#b) Colsample_bylevel:
+set.seed(1284654)
+conv_cs1 = matrix(NA,500,length(cs))
+pred_cs1 = matrix(NA,nrow(test2), length(cs))
+colnames(conv_cs1) = colnames(pred_cs1) = cs
+
+for(i in 1:length(cs)){
+  params = list(eta = eta[standard[1]], colsample_bylevel = cs[i],
+                subsample = ss[standard[4]], max_depth = md[standard[3]],
+                min_child_weigth = 1)
+  xgb=xgboost(xtrain1, label = ytrain1,nrounds = 500, params = params)
+  conv_cs1[,i] = xgb$evaluation_log$train_rmse
+  pred_cs1[,i] = predict(xgb, xtest1)
+}
+
+
+conv_cs1 = data.frame(iter=1:500, conv_cs1)
+conv_cs1 = melt(conv_cs1, id.vars = "iter")
+ggplot(data = conv_cs1) + geom_line(aes(x = iter, y = value, color = variable))
+(RMSE_cs1 = sqrt(colMeans((as.numeric(ytest1)-pred_cs1)^2)))
+
+#c) Max Depth: 
+set.seed(1284654)
+conv_md1=matrix(NA,500,length(md))
+pred_md1=matrix(NA,nrow(test2),length(md))
+colnames(conv_md1)=colnames(pred_md1)=md
+
+for(i in 1:length(md)){
+  params=list(eta=eta[standard[1]],colsample_bylevel=cs[standard[2]],
+              subsample=ss[standard[4]],max_depth=md[i],
+              min_child_weigth=1)
+  xgb=xgboost(xtrain1, label = ytrain1,nrounds = 500,params=params)
+  conv_md1[,i] = xgb$evaluation_log$train_rmse
+  pred_md1[,i] = predict(xgb, xtest1)
+}
+
+conv_md1=data.frame(iter=1:500,conv_md1)
+conv_md1=melt(conv_md1,id.vars = "iter")
+ggplot(data=conv_md1)+geom_line(aes(x=iter,y=value,color=variable))
+(RMSE_md1=sqrt(colMeans((as.numeric(ytest1)-pred_md1)^2)))
+
+#d) Sub Sample: 
+set.seed(1)
+conv_ss1=matrix(NA,500,length(ss))
+pred_ss1=matrix(NA,nrow(test2),length(ss))
+colnames(conv_ss1)=colnames(pred_ss1)=ss
+
+for(i in 1:length(ss)){
+  params=list(eta=eta[standard[1]],colsample_bylevel=cs[standard[2]],
+              subsample=ss[i],max_depth=md[standard[3]],
+              min_child_weigth=1)
+  xgb=xgboost(xtrain1, label = ytrain1,nrounds = 500,params=params)
+  conv_ss1[,i] = xgb$evaluation_log$train_rmse
+  pred_ss1[,i] = predict(xgb, xtest1)
+}
+
+conv_ss1=data.frame(iter=1:500,conv_ss1)
+conv_ss1=melt(conv_ss1,id.vars = "iter")
+ggplot(data=conv_ss1)+geom_line(aes(x=iter,y=value,color=variable))
+(RMSE_ss1=sqrt(colMeans((as.numeric(ytest1)-pred_ss1)^2)))
+
+
+#e) min_child weight:
+set.seed(12754)
+conv_mcw1= matrix(NA,500,length(mcw))
+pred_mcw1= matrix(NA,nrow(test2), length(mcw))
+colnames(conv_mcw1) = colnames(pred_mcw1) = mcw
+
+for(i in 1:length(mcw)){
+  params = list(eta = 0.1, colsample_bylevel=2/3,
+                subsample = 1, max_depth = 6,
+                min_child_weight = mcw[i], gamma = 0)
+  xgb = xgboost(xtrain1, label = ytrain1, nrounds = 500, params = params)
+  conv_mcw1[,i] = xgb$evaluation_log$train_rmse
+  pred_mcw1[,i] = predict(xgb, xtest1)
+}
+
+conv_mcw1= data.frame(iter=1:500, conv_mcw1)
+conv_mcw1= melt(conv_mcw1, id.vars = "iter")
+ggplot(data = conv_mcw1) + geom_line(aes(x = iter, y = value, color = variable))
+(RMSE_mcw1 = sqrt(colMeans((as.numeric(ytest1)-pred_mcw1)^2)))
+#we select the hyperparameter = 100 because of the same reason as above. 
+
+
+#f) Gamma: 
+set.seed(12897564)
+conv_gamma1= matrix(NA,500,length(gamma))
+pred_gamma1= matrix(NA,nrow(test2), length(gamma))
+colnames(conv_gamma1) = colnames(pred_gamma1) = gamma
+
+for(i in 1:length(gamma)){
+  params = list(eta = 0.1, colsample_bylevel=2/3,
+                subsample = 1, max_depth = 6, min_child_weight = 1,
+                gamma = gamma[i])
+  xgb = xgboost(xtrain1, label = ytrain1, nrounds = 500, params = params)
+  conv_gamma1[,i] = xgb$evaluation_log$train_rmse
+  pred_gamma1[,i] = predict(xgb, xtest1)
+}
+
+conv_gamma1 = data.frame(iter=1:500, conv_gamma1)
+conv_gamma1 = melt(conv_gamma1, id.vars = "iter")
+ggplot(data = conv_gamma1) + geom_line(aes(x = iter, y = value, color = variable))
+(RMSE_gamma1 = sqrt(colMeans((as.numeric(ytest1)-pred_gamma1)^2)))
+
+
+
+#Setting the values: 
+xgb2<- xgboost(data = xtrain1, label = ytrain1,
+                nrounds = 500)
+
+#set these values manually by looking at RMSE values:
+params1 = list(eta = .05, colsample_bylevel = 1/3,
+              subsample = 1 , max_depth = 2,
+              min_child_weigth = 400)
+params1
+
+
+xgb.train1 <- xgboost(data = xtrain1, label = ytrain1,
+                     params = params1,
+                     nrounds = 500, objective = "reg:squarederror")
+
+
+xgb.test1 <- xgboost(data = xtest1, label = ytest1,
+                    params = params1,
+                    nrounds = 500, objective = "reg:squarederror")
+
+
+# run test model
+y_pred1.1 <- predict(xgb.train1, xtest1)
+y_pred1.1
+# get MSE
+test.MSE3<-mean((ytest1 - y_pred1.1)^2)
+test.MSE3
+# get residual (if continuous outcome)
+r3<-ytest1 - y_pred1.1
+plot(r3, ylab = "residuals", main = "XGB residuals")
+qqnorm(r3)
+
+
+#Plot: 
+#get the first three trees
+xgb.plot.tree(model = xgb.train1, trees = 0:4)
+xgb.plot.multi.trees(xgb.train1)
+importance_matrix1 <- xgb.importance(model = xgb.train1)
+importance_matrix1
+xgb.plot.importance(importance_matrix1, xlab = "Feature Importance")
