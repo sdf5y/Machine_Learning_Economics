@@ -372,11 +372,15 @@ write.csv(clean_group3, 'clean_group3.csv')
 write.csv(hopefully_all, 'hopefully.csv')
 
 #Q7------
+
 colnames(hopefully_all)
 temp <-  hopefully_all[, c(38:58)]
 temp <- sapply(temp, as.numeric)
-temp_nn <- na.omit(temp)
-#temp <- replace(temp, c('NA', "na"), NA)
+
+temp_imputed <- apply(temp, 2, function(x) {
+  x[is.na(x)] <- mean(x, na.rm = TRUE)
+  return(x)
+})
 
 #### PCA
 library(ggcorrplot)
@@ -385,7 +389,8 @@ library(factoextra)
 # PCA is based on correlations, not distance.
 ## So we need to store the correlation matrix.
 
-corr_matrix <- cor(temp_nn)
+corr_matrix <- cor(temp_imputed)
+corr_matrix <- scale(corr_matrix)
 ggcorrplot(corr_matrix)
 
 ## do PCA
@@ -408,8 +413,28 @@ qplot(c(1:21), variance_explained) +
   xlab("Principal Component") + 
   ylab("Variance Explained") +
   ggtitle("Scree Plot") +
-  ylim(0, 100)                    
+  ylim(0, 100)    
 
+
+#get 4 components 
+feature_vector <- (debt.pca$loadings)
+feature_vector_transposed <- t(feature_vector)
+
+original_data_transposed <- t(temp_imputed)
+
+dim(original_data_transposed)
+dim(feature_vector)
+
+data_reoriented <- feature_vector_transposed %*% original_data_transposed
+
+data_reoriented_df <- as.data.frame(data_reoriented)
+data_reoriented_df <- t(data_reoriented_df)
+
+comps <- data_reoriented_df[,c(1:4)]
+
+comps <- as.data.frame(comps)
+
+#now merge to the dataset
 temp2 <- cbind(hopefully_all[,-c(35:58)], comps)
 
 colnames(temp2)
@@ -508,17 +533,17 @@ q9_s <- data.frame(
   })
 )
 
-logged_vs <- log(q9_s[,c(15:25)])
+logged_vs <- log(q9_s[,c(13:25)])
 lognames <- colnames(logged_vs)
 lognames <- paste("log", lognames)
 colnames(logged_vs) <- lognames
 
-squared_vs <- q9_s[,c(15:25)]^2
+squared_vs <- q9_s[,c(13:25)]^2
 sqnames <- colnames(squared_vs)
 sqnames <- paste("sq", sqnames)
 colnames(squared_vs) <- sqnames
 
-standardized_vs <- scale(q9_s[,c(15:25)])
+standardized_vs <- scale(q9_s[,c(13:25)])
 stan_names <- colnames(standardized_vs)
 stan_names <- paste("stan", stan_names)
 colnames(standardized_vs) <- stan_names
