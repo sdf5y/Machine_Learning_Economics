@@ -390,7 +390,7 @@ q9_test$Year <- year(q9_test$Date.received)
 q9_test <- q9_test %>%
   select(Sub.product, Issue, Sub.issue, Consumer.consent.provided., Submitted.via, Timely.response. , relief, drop, 
          Dispute_prior, servicemenber, olderAm, 
-         Fips, Pop_less25, Pop_over64, Pop_Hispanic, w_total, b_total, a_total, combo_native_total, TotalMale, TotalFemale,
+         Fips, Pop_less25, Pop_over64, Pop_Hispanic, w_sum, b_sum, a_sum, combo_native, TotalMale, TotalFemale,
          Share.of.people.of.color, Average.household.income..All, Average.household.income..Comm.of.color, Average.household.income..White.comm,
          Comp.1, Comp.2,Comp.3, Comp.4, MedicalDebtClusters,  Year)
 
