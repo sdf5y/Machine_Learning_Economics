@@ -25,6 +25,10 @@ library(zipcodeR)
 #install.packages('stringr')
 library(stringr)
 library(glmnet)
+library(caret)
+library(caTools)
+library(xgboost)
+library(Matrix)
 
 #Loading The Data----
 
@@ -205,7 +209,7 @@ for (error_state in unique(group3$State[group3$ZIP.code %in% error_zips])) {
 unique_zips <- unique(group3$ZIP.code)
 zip_binary_map <- unique_zips %in% fips_data$ZIP
 table(zip_binary_map) #looks like there are no issues anymore 
-
+ 
 #rm(i, zip, zip_binary_map, unique_zips, unclean_zips) #remove these variables when done.
 
 #FIPS Fix ------
@@ -234,22 +238,18 @@ merg_zips <- merge(group3, fips_data, by.x =  'ZIP.code', by.y = 'ZIP')
 
 #Q4 -----
 
-merg_fips <- merge(merg_zips, countydebt,  by.x = 'STCOUNTYFP', by.y = 'County FIPS') #by = c('STCOUNTYFP' =  'County FIPS')) 
+merg_fips <- merge(merg_zips, countydebt,  by.x = 'STCOUNTYFP', by.y = 'County FIPS')  
 
 #Q5----
 
 census_fips <- (paste(census$STATE, census$COUNTY, sep = ""))
 
+census_fips <- ifelse(!(census_fips %in% fips_data$STCOUNTYFP), paste0('0', census_fips), census_fips)
+table(census_fips %in% fips_data$STCOUNTYFP)
+
 census <- cbind(census, census_fips)
 
-#Prep Split Dataset by Male/Female
-indx <- grepl('_FEMALE', colnames(census))
-female_df <- census[indx]
-rm(indx)
-
-indx <- grepl('_MALE', colnames(census))
-male_df <- census[indx]
-colnames(male_df)
+county_totals <- subset(census, (AGEGRP == 0 & YEAR == 1))
 
 #Age dummies
 
@@ -277,19 +277,11 @@ combined_results2 <- bind_rows(results_list2, .id = "Pop_over64")
 
 #Ethnicity 
 
-county_totals <- subset(census, (AGEGRP == 0 & YEAR == 1))
 colnames(county_totals)
 
-results_list3 <- list()
-i <- 1
-for (i in 1:nrow(county_totals)){
-  result <- sum(county_totals$H_FEMALE[i], county_totals$H_MALE[i])
-  results_list3[[i]] <- result
-}
+county_demos <- cbind(bind_rows(results_list, .id = "Pop_less25"), bind_rows(results_list2, .id = "Pop_over64"))
 
-combined_results3 <- data.frame('Pop_Hispanic' = unlist(results_list3))
-
-county_demos <- cbind(bind_rows(results_list, .id = "Pop_less25"), bind_rows(results_list2, .id = "Pop_over64"), combined_results3)
+county_demos$Pop_Hispanic <- rowSums(county_totals[, c('H_FEMALE', 'H_MALE')])
 
 colnames(county_demos) <- c("Fips", "Pop_less25", "Fips", "Pop_over64", "Pop_Hispanic")
 county_demos <- county_demos[,-3]
@@ -301,67 +293,51 @@ group3$olderAm <- ifelse(str_detect(group3$Tags, "Older American"), 1, 0)
 #Race counts per county
 
 #whites
-indx <- grepl('WA', colnames(census))
-whites_df <- census[indx]
+indx <- grepl('WA', colnames(county_totals))
+whites_df <- county_totals[indx]
 w_sum <- rowSums(whites_df)
 
 #Blacks
-indx <- grepl('BA', colnames(census))
-black_df <- census[indx]
+indx <- grepl('BA', colnames(county_totals))
+black_df <- county_totals[indx]
 b_sum <- rowSums(black_df)
 
 #Asian
-indx <- grepl('AA', colnames(census))
-asian_df <- census[indx]
+indx <- grepl('AA', colnames(county_totals))
+asian_df <- county_totals[indx]
 a_sum <- rowSums(asian_df)
 
 #Native Americans
-indx <- grepl('IA', colnames(census))
-indx2 <- grepl('NA', colnames(census))
-native_df <- census[indx]
-native2_df <- census[indx2]
+indx <- grepl('IA', colnames(county_totals))
+indx2 <- grepl('NA', colnames(county_totals))
+native_df <- county_totals[indx]
+native2_df <- county_totals[indx2]
 native2_df <- native2_df[,-c(1,2)]
 n_sum <- rowSums(native_df)
 nsum2 <- rowSums(native2_df)
 
 combo_native <- n_sum + nsum2
 
+Fips <- county_totals$census_fips
+
 #including them into demographic df
-races_all <- cbind(census_fips, w_sum, b_sum, a_sum, combo_native)
+races_all <- cbind(Fips, w_sum, b_sum, a_sum, combo_native)
 races_all <- as.data.frame(races_all) 
+races_all[, 2:5] <- apply(races_all[, 2:5], 2, as.numeric)
 
-results_list4 <- list()
-
-for (fip in unique_fips) {
-  result <- races_all %>%
-    mutate_at(vars(w_sum, b_sum, a_sum, combo_native), as.numeric) %>%
-    filter(census_fips == fip) %>%
-    summarise(w_total = sum(w_sum),  
-              b_total = sum(b_sum),
-              a_total = sum(a_sum),
-              combo_native_total = sum(combo_native))
-  
-  results_list4[[fip]] <- result
-}
-
-combined_results4 <- do.call(rbind, results_list4)
-
-county_demos <- cbind(county_demos, combined_results4)
+county_demos <- left_join(county_demos, races_all, by = "Fips")
 
 #include male and female county totals
-county_demos$TotalMale <- county_totals$TOM_MALE
+county_demos$TotalMale <- county_totals$TOT_MALE
 county_demos$TotalFemale <- county_totals$TOT_FEMALE
-
-county_demos$Fips <- as.character(paste0("0", county_demos$Fips))
 
 #Q6-----
 
 #matching fips to zips
 
 merg_county_demos <- merge(county_demos, fips_data, by.x = 'Fips', by.y = "STCOUNTYFP")
-clean_group3 <- left_join(group3, merg_county_demos, by = c('ZIP.code' = 'ZIP'))
 
-clean_group3$Fips <- as.character(clean_group3$Fips)
+clean_group3 <- left_join(group3, merg_county_demos, by = c('ZIP.code' = 'ZIP'))
 
 hopefully_all <- left_join(clean_group3, countydebt, by = c('Fips' = 'County FIPS'))
 
@@ -458,8 +434,8 @@ ca <- NWA[, c("Sub.product",
                  "Issue",
                  "Pop_over64",
                  "TotalFemale",
-                 "Average.household.income..Comm.of.color",
-                 "Share.of.people.of.color")    ]
+                 "Average household income, Comm of color",
+                 "Share of people of color")    ]
 
 ca[,1] <- as.factor(ca[,1] )
 ca[,2] <- as.factor(ca[,2] )
@@ -517,12 +493,12 @@ q9$Year <- year(q9$Date.received)
 
 q9 <- q9 %>%
   select(Sub.product, Issue, Sub.issue, Consumer.consent.provided., Submitted.via, Timely.response. , relief, drop, 
-  Dispute_prior, servicemenber, olderAm, 
-  Fips, Pop_less25, Pop_over64, Pop_Hispanic, w_total, b_total, a_total, combo_native_total, TotalMale, TotalFemale,
+         Dispute_prior, servicemenber, olderAm, 
+  Fips, Pop_less25, Pop_over64, Pop_Hispanic, w_sum, b_sum, a_sum, combo_native, TotalMale, TotalFemale,
   Share.of.people.of.color, Average.household.income..All, Average.household.income..Comm.of.color, Average.household.income..White.comm,
  Comp.1, Comp.2,Comp.3, Comp.4, MedicalDebtClusters,  Year)
 
-table(q9$Year) #we are dropping the variables below the year 2024
+table(q9$Year) 
 
 #Transformations -------
 
