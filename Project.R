@@ -1087,3 +1087,46 @@ xgb.plot.multi.trees(xgb.train1)
 importance_matrix1 <- xgb.importance(model = xgb.train1)
 importance_matrix1
 xgb.plot.importance(importance_matrix1, xlab = "Feature Importance")
+
+
+##################################### Neural Network ----
+nn.pred = predict(nn.model, newdata = nn.test.data)
+
+nn.prec = vector('double')
+nn.recall = vector('double')
+
+nn.threshold = seq(0.01,0.9,0.01)
+
+best.threshold = 1
+best.f1 = 0
+for(i in 1:length(nn.threshold))
+{
+  print(i)
+  cm = table(as.vector(nn.test.data[,1]),
+           ifelse(nn.pred>=nn.threshold[i],1,0))
+  if(dim(cm)[2] == 2)
+  {
+    nn.prec = c(nn.prec,cm[2,2] / (cm[2,2] + cm[1,2])) 
+    nn.recall = c(nn.recall,cm[2,2] / (cm[2,2] + cm[2,1])) 
+  }
+  else{
+    nn.prec = c(nn.prec,0)
+    nn.recall = c(nn.recall,0)
+  }
+  temp.f1 = 2 * nn.prec[i] * nn.recall[i] / (nn.prec[i] + nn.recall[i])
+  print(temp.f1)
+  if(!is.nan(temp.f1))
+  {
+    if(temp.f1 > best.f1)
+    {
+      best.f1 = temp.f1
+      best.threshold = nn.threshold[i]
+    }
+  }
+}
+plot(nn.recall,nn.prec)
+
+cm.best = table(as.vector(nn.test.data[,1]),
+                ifelse(nn.pred >= best.threshold,1,0))
+
+cm.best.df = as.data.frame(cm.best)
