@@ -56,7 +56,7 @@ testgroup3$drop <- as.numeric(testgroup3$State %in% c("NONE", "None", "DC", "AA"
 testgroup3 <- subset(testgroup3, !(State %in% c("AE", 'AP'))) #dropping military bases
 
 #older Americans and servicefolk
-testgroup3$servicemenber <- ifelse(str_detect(testgroup3$Tags, "Servicemember"), 1, 0)
+testgroup3$servicemember <- ifelse(str_detect(testgroup3$Tags, "Servicemember"), 1, 0)
 testgroup3$olderAm <- ifelse(str_detect(testgroup3$Tags, "Older American"), 1, 0)
 
 fips_data <- fips_data[!fips_data$STATE %in% c("NONE", "None", "DC", "AA", "AS", 'AP', "AE", "FM","GU", "MH", "MP", "PR", "VI", "UNITED STATES MINOR OUTLYING ISLANDS"),]
@@ -251,6 +251,8 @@ colnames(cleantest)
 temp <- cleantest[, c(32:52)]
 temp <- sapply(temp, as.numeric)
 
+imputation_map_pca_val <- is.na(temp)
+
 temp_imputed <- apply(temp, 2, function(x) {
   x[is.na(x)] <- mean(x, na.rm = TRUE)
   return(x)
@@ -342,7 +344,7 @@ colnames(ca) <- c("Sub.product",
 
 ca$medicaldebt <- as.factor(ifelse(ca$Sub.product == "Medical debt", 1,0))
 
-count(is.na(ca))
+impute_map_medical_val <- is.na(ca)
 
 # 2 cluster
 kpres2 <- kproto(x=ca[,c(2:7)], k=2, na.rm = 'imp.internal')
@@ -385,12 +387,12 @@ q9_test$`Average.household.income..White.comm` <- q9_test$`Average household inc
 
 library(lubridate)
 
-q9_test$Year <- year(q9_test$Date.received)
+q9_test$Year <- as.factor(year(q9_test$Date.received))
 
 q9_test <- q9_test %>%
   select(Sub.product, Issue, Sub.issue, Consumer.consent.provided., Submitted.via, Timely.response. , relief, drop, 
-         Dispute_prior, servicemenber, olderAm, 
-         Fips, Pop_less25, Pop_over64, Pop_Hispanic, w_sum, b_sum, a_sum, combo_native, TotalMale, TotalFemale,
+         Dispute_prior, servicemember, olderAm, 
+         Fips, Pop_less25, Pop_over64, Pop_Hispanic, White, Black, Asian, Indigenous, Native, TotalMale, TotalFemale,
          Share.of.people.of.color, Average.household.income..All, Average.household.income..Comm.of.color, Average.household.income..White.comm,
          Comp.1, Comp.2,Comp.3, Comp.4, MedicalDebtClusters,  Year)
 
@@ -409,8 +411,3 @@ q9_s_test <- q9_s_test %>%
   filter(complete.cases(.))
 
 write.csv(q9_s_test, "q9_s_test.csv")
-
-#Modeling ----
-
-
-
