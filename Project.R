@@ -210,7 +210,7 @@ unique_zips <- unique(group3$ZIP.code)
 zip_binary_map <- unique_zips %in% fips_data$ZIP
 table(zip_binary_map) #looks like there are no issues anymore 
  
-#rm(i, zip, zip_binary_map, unique_zips, unclean_zips) #remove these variables when done.
+rm(i, zip, zip_binary_map, unique_zips, unclean_zips) #remove these variables when done.
 
 #FIPS Fix ------
 
@@ -286,50 +286,41 @@ county_demos$Pop_Hispanic <- rowSums(county_totals[, c('H_FEMALE', 'H_MALE')])
 colnames(county_demos) <- c("Fips", "Pop_less25", "Fips", "Pop_over64", "Pop_Hispanic")
 county_demos <- county_demos[,-3]
 
+#include male and female county totals
+county_demos$TotalMale <- county_totals$TOT_MALE
+county_demos$TotalFemale <- county_totals$TOT_FEMALE
+
 #older Americans and servicefolk
 group3$servicemenber <- ifelse(str_detect(group3$Tags, "Servicemember"), 1, 0)
 group3$olderAm <- ifelse(str_detect(group3$Tags, "Older American"), 1, 0)
 
 #Race counts per county
 
-#whites
-indx <- grepl('WA', colnames(county_totals))
-whites_df <- county_totals[indx]
-w_sum <- rowSums(whites_df)
+races <- county_totals[,c("WA_MALE", "WA_FEMALE", "BA_MALE", "BA_FEMALE", 
+  "IA_MALE", "IA_FEMALE", "AA_MALE", "AA_FEMALE", "NA_MALE", "NA_FEMALE")]
 
-#Blacks
-indx <- grepl('BA', colnames(county_totals))
-black_df <- county_totals[indx]
-b_sum <- rowSums(black_df)
+tot_white <- rowSums(races[,1:2])
+tot_black <- rowSums(races[,3:4])
+tot_indigenous <- rowSums(races[,5:6])
+tot_asian <- rowSums(races[,6:7])
+tot_native <- rowSums(races[,7:8])
 
-#Asian
-indx <- grepl('AA', colnames(county_totals))
-asian_df <- county_totals[indx]
-a_sum <- rowSums(asian_df)
+total_population <- data.frame(White = tot_white, 
+                      Black = tot_black, 
+                      Indigenous = tot_indigenous, 
+                      Asian = tot_asian, 
+                      Native = tot_native,
+                      County_pop = county_totals$TOT_POP,
+                      Fips = county_totals$census_fips)
 
-#Native Americans
-indx <- grepl('IA', colnames(county_totals))
-indx2 <- grepl('NA', colnames(county_totals))
-native_df <- county_totals[indx]
-native2_df <- county_totals[indx2]
-native2_df <- native2_df[,-c(1,2)]
-n_sum <- rowSums(native_df)
-nsum2 <- rowSums(native2_df)
+county_demos <- left_join(county_demos, total_population, by = "Fips")
 
-combo_native <- n_sum + nsum2
+result <- apply(county_demos[, 2:11], 2, function(x) {
+  x / total_population$County_pop
+})
 
-Fips <- county_totals$census_fips
-
-#including them into demographic df
-races_all <- cbind(Fips, w_sum, b_sum, a_sum, combo_native)
-races_all <- as.data.frame(races_all) 
-races_all[, 2:5] <- apply(races_all[, 2:5], 2, as.numeric)
-
-county_demos <- left_join(county_demos, races_all, by = "Fips")
-
-#include male and female county totals
-county_demos$TotalMale <- county_totals$TOT_MALE
-county_demos$TotalFemale <- county_totals$TOT_FEMALE
+county_demos[,2:11] <- result
+county_demos <- county_demos[,-12]
 
 #Q6-----
 
@@ -350,8 +341,10 @@ write.csv(hopefully_all, 'hopefully.csv')
 #Q7------
 
 colnames(hopefully_all)
-temp <-  hopefully_all[, c(38:58)]
+temp <-  hopefully_all[, c(39:59)]
 temp <- sapply(temp, as.numeric)
+
+imputation_map <- is.na(temp)
 
 temp_imputed <- apply(temp, 2, function(x) {
   x[is.na(x)] <- mean(x, na.rm = TRUE)
@@ -411,7 +404,7 @@ comps <- data_reoriented_df[,c(1:4)]
 comps <- as.data.frame(comps)
 
 #now merge to the dataset
-temp2 <- cbind(hopefully_all[,-c(35:58)], comps)
+temp2 <- cbind(hopefully_all[,-c(36:59)], comps)
 
 colnames(temp2)
 
@@ -434,8 +427,8 @@ ca <- NWA[, c("Sub.product",
                  "Issue",
                  "Pop_over64",
                  "TotalFemale",
-                 "Average household income, Comm of color",
-                 "Share of people of color")    ]
+                 "Average.household.income..Comm.of.color",
+                 "Share.of.people.of.color")    ]
 
 ca[,1] <- as.factor(ca[,1] )
 ca[,2] <- as.factor(ca[,2] )
@@ -454,6 +447,8 @@ colnames(ca) <- c("Sub.product",
 ca$medicaldebt <- as.factor(ifelse(ca$Sub.product == "Medical debt", 1,0))
 
 count(is.na(ca))
+
+impute_map_medical <- is.na(ca)
 
 # 2 cluster
 kpres2 <- kproto(x=ca[,c(2:7)], k=2, na.rm = 'imp.internal')
@@ -489,16 +484,14 @@ colnames(q9)
 
 library(lubridate)
 
-q9$Year <- year(q9$Date.received)
+q9$Year <- as.factor(year(q9$Date.received))
 
 q9 <- q9 %>%
   select(Sub.product, Issue, Sub.issue, Consumer.consent.provided., Submitted.via, Timely.response. , relief, drop, 
          Dispute_prior, servicemenber, olderAm, 
-  Fips, Pop_less25, Pop_over64, Pop_Hispanic, w_sum, b_sum, a_sum, combo_native, TotalMale, TotalFemale,
+  Fips, Pop_less25, Pop_over64, Pop_Hispanic, White, Black, Asian, Native, Indigenous, TotalMale, TotalFemale,
   Share.of.people.of.color, Average.household.income..All, Average.household.income..Comm.of.color, Average.household.income..White.comm,
  Comp.1, Comp.2,Comp.3, Comp.4, MedicalDebtClusters,  Year)
-
-table(q9$Year) 
 
 #Transformations -------
 
@@ -509,6 +502,7 @@ q9_s <- data.frame(
   })
 )
 
+'''
 logged_vs <- log(q9_s[,c(13:25)])
 lognames <- colnames(logged_vs)
 lognames <- paste("log", lognames)
@@ -525,6 +519,7 @@ stan_names <- paste("stan", stan_names)
 colnames(standardized_vs) <- stan_names
 
 q9_s <- cbind(q9_s, logged_vs, squared_vs, standardized_vs)
+'''
 
 q9_s <- q9_s %>%
   filter(complete.cases(.))
