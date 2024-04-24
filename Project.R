@@ -291,7 +291,7 @@ county_demos$TotalMale <- county_totals$TOT_MALE
 county_demos$TotalFemale <- county_totals$TOT_FEMALE
 
 #older Americans and servicefolk
-group3$servicemenber <- ifelse(str_detect(group3$Tags, "Servicemember"), 1, 0)
+group3$servicemember <- ifelse(str_detect(group3$Tags, "Servicemember"), 1, 0)
 group3$olderAm <- ifelse(str_detect(group3$Tags, "Older American"), 1, 0)
 
 #Race counts per county
@@ -488,7 +488,7 @@ q9$Year <- as.factor(year(q9$Date.received))
 
 q9 <- q9 %>%
   select(Sub.product, Issue, Sub.issue, Consumer.consent.provided., Submitted.via, Timely.response. , relief, drop, 
-         Dispute_prior, servicemenber, olderAm, 
+         Dispute_prior, servicemember, olderAm, 
   Fips, Pop_less25, Pop_over64, Pop_Hispanic, White, Black, Asian, Native, Indigenous, TotalMale, TotalFemale,
   Share.of.people.of.color, Average.household.income..All, Average.household.income..Comm.of.color, Average.household.income..White.comm,
  Comp.1, Comp.2,Comp.3, Comp.4, MedicalDebtClusters,  Year)
