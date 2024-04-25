@@ -627,6 +627,30 @@ head(interactions_frame[order(interactions_frame$occurrences, decreasing = TRUE)
 plot_min_depth_interactions(interactions_frame)
 
 ################################################ XG Boost #######################################################
+#Loading the training dataset: 
+q9_s<-read.csv("q9_s.csv")
+view(q9_s)
+
+
+#Subsetting the oversampled data:
+q9_s<- q9_s %>%
+  select(Sub.product, Issue, Sub.issue, Consumer.consent.provided., Submitted.via, Timely.response. , relief, drop, 
+         Dispute_prior, servicemember, olderAm, 
+         Fips, Pop_less25, Pop_over64, Pop_Hispanic, White, Black, Asian, Indigenous, Native, Multiple, TotalMale, TotalFemale,
+         Share.of.people.of.color, Average.household.income..All, Average.household.income..Comm.of.color, Average.household.income..White.comm,
+         Comp.1, Comp.2,Comp.3, Comp.4, MedicalDebtClusters,Year)
+
+view(q9_s)
+
+
+q9_s<- data.frame(
+  lapply(q9_s, function(x) {
+    if(is.character(x)) factor(x) else x
+  })
+)
+
+
+############################ XG Boost #######################################
 set.seed(27514)
 split.imp <- sample.split(q9_s, SplitRatio = 0.7)
 train1 <-  subset(q9_s, split.imp == "TRUE")
@@ -677,7 +701,8 @@ mcw=c(1,10,100,400)
 # = gamma candidates = #
 gamma=c(0.1,1,10,100)
 
-#a) ETA search:
+#Running different hyperparameters: 
+#a) eta:
 set.seed(13856)
 conv_eta = matrix(NA,500,length(eta))
 pred_eta = matrix(NA,nrow(test1), length(eta))
@@ -698,6 +723,7 @@ conv_eta = melt(conv_eta, id.vars = "iter")
 ggplot(data = conv_eta) + geom_line(aes(x = iter, y = value, color = variable))
 (RMSE_eta = sqrt(colMeans((as.numeric(ytest)-pred_eta)^2)))
 
+
 #b) Colsample_bylevel:
 set.seed(1284654)
 conv_cs = matrix(NA,500,length(cs))
@@ -713,11 +739,11 @@ for(i in 1:length(cs)){
   pred_cs[,i] = predict(xgb, xtest)
 }
 
-
 conv_cs = data.frame(iter=1:500, conv_cs)
 conv_cs = melt(conv_cs, id.vars = "iter")
 ggplot(data = conv_cs) + geom_line(aes(x = iter, y = value, color = variable))
 (RMSE_cs = sqrt(colMeans((as.numeric(ytest)-pred_cs)^2)))
+
 
 #c) Max Depth: 
 set.seed(1284654)
@@ -739,6 +765,7 @@ conv_md=melt(conv_md,id.vars = "iter")
 ggplot(data=conv_md)+geom_line(aes(x=iter,y=value,color=variable))
 (RMSE_md=sqrt(colMeans((as.numeric(ytest)-pred_md)^2)))
 
+
 #d) Sub Sample: 
 set.seed(1)
 conv_ss=matrix(NA,500,length(ss))
@@ -758,8 +785,7 @@ conv_ss=data.frame(iter=1:500,conv_ss)
 conv_ss=melt(conv_ss,id.vars = "iter")
 ggplot(data=conv_ss)+geom_line(aes(x=iter,y=value,color=variable))
 (RMSE_ss=sqrt(colMeans((as.numeric(ytest)-pred_ss)^2)))
-#We plan on proceeding with 0.75 because there isn't significant difference between the RMSE value of 
-#0.75 and 1. Secondly, we use 0.75 to account for any possible outliers. 
+
 
 #e) min_child weight:
 set.seed(12754)
@@ -780,8 +806,6 @@ conv_mcw = data.frame(iter=1:500, conv_mcw)
 conv_mcw = melt(conv_mcw, id.vars = "iter")
 ggplot(data = conv_mcw) + geom_line(aes(x = iter, y = value, color = variable))
 (RMSE_mcw = sqrt(colMeans((as.numeric(ytest)-pred_mcw)^2)))
-#we select the hyperparameter = 100 because of the same reason as above. 
-
 
 #f) Gamma: 
 set.seed(12897564)
@@ -804,30 +828,29 @@ ggplot(data = conv_gamma) + geom_line(aes(x = iter, y = value, color = variable)
 (RMSE_gamma = sqrt(colMeans((as.numeric(ytest)-pred_gamma)^2)))
 
 
-
 #Setting the values: 
 xgb1 <- xgboost(data = xtrain, label = ytrain,
                 nrounds = 500)
 
 #set these values manually by looking at RMSE values:
 params = list(eta = .05, colsample_bylevel = 1/3,
-              subsample = 0.75 , max_depth = 2,
-              min_child_weigth = 100)
+              subsample = 1, max_depth = 2,
+              min_child_weigth = 400, gamma = 1)
 params
 
 
 xgb.train <- xgboost(data = xtrain, label = ytrain,
-                     params = params,
-                     nrounds = 500, objective = "reg:squarederror")
+                     params = params,weight = ifelse(ytrain == 1, 5, 1),
+                     nrounds = 500, objective = "binary:logistic")
 
 
 xgb.test <- xgboost(data = xtest, label = ytest,
                     params = params,
-                    nrounds = 500, objective = "reg:squarederror")
-
+                    nrounds = 500, objective = "binary:logistic")
 
 # run test model
 y_pred <- predict(xgb.train, xtest)
+y_pred
 # get MSE
 test.MSE2<-mean((ytest - y_pred)^2)
 test.MSE2
@@ -839,12 +862,13 @@ qqnorm(r2)
 
 #Plot: 
 #get the first three trees
-xgb.plot.tree(model = xgb.train, trees = 0:4)
+xgb.plot.tree(model = xgb.train, trees = 0:2)
 xgb.plot.multi.trees(xgb.train)
 importance_matrix <- xgb.importance(model = xgb.train)
 importance_matrix
 xgb.plot.importance(importance_matrix, xlab = "Feature Importance")
 
+hist(y_pred)
 
 #################################### XG Boost without olderAM variable ##############################################
 
@@ -856,7 +880,6 @@ q9_s1<-q9_s%>%
   select(-olderAm)
 view(q9_s1)
 
-#Following is the XG boost code:      
 
 ################################### XG Boost 1 #####################################################
 #convert all character columns to factor
@@ -865,6 +888,7 @@ q9_s1<- data.frame(
     if(is.character(x)) factor(x) else x
   })
 )
+
 set.seed(27514)
 split.imp1 <- sample.split(q9_s1, SplitRatio = 0.7)
 train2 <-  subset(q9_s1, split.imp == "TRUE")
@@ -876,16 +900,18 @@ ytrain1<- as.array(train2$relief)
 xtest1<- sparse.model.matrix(relief ~ .-1, data = test2)
 ytest1<- as.array(test2$relief)
 
-### run train model
+### running the default train model
 xgb2<- xgboost(data = xtrain1, label = ytrain1,
-                nrounds = 500)
+               nrounds = 500)
 
 # run test model
 y_pred1<- predict(xgb2, xtest1)
 y_pred1
+
 # get MSE
 test.MSE1<-mean((ytest1 - y_pred1)^2)
 test.MSE1
+
 # get residual (if continuous outcome)
 r1<-ytest1 - y_pred1
 qqnorm(r1)
@@ -893,7 +919,7 @@ qqnorm(r1)
 ### plot
 xgb.plot.multi.trees(xgb2)
 
-#Various different hyperparameters:
+#Setting hyperparameters:
 #eta:
 eta=c(0.05, 0.1, 0.2,0.5,1)
 
@@ -930,7 +956,6 @@ for(i in 1:length(eta)){
   pred_eta1[,i] = predict(xgb, xtest1)
 }
 
-
 conv_eta1 = data.frame(iter=1:500, conv_eta1)
 conv_eta1 = melt(conv_eta1, id.vars = "iter")
 ggplot(data = conv_eta1) + geom_line(aes(x = iter, y = value, color = variable))
@@ -950,7 +975,6 @@ for(i in 1:length(cs)){
   conv_cs1[,i] = xgb$evaluation_log$train_rmse
   pred_cs1[,i] = predict(xgb, xtest1)
 }
-
 
 conv_cs1 = data.frame(iter=1:500, conv_cs1)
 conv_cs1 = melt(conv_cs1, id.vars = "iter")
@@ -997,7 +1021,6 @@ conv_ss1=melt(conv_ss1,id.vars = "iter")
 ggplot(data=conv_ss1)+geom_line(aes(x=iter,y=value,color=variable))
 (RMSE_ss1=sqrt(colMeans((as.numeric(ytest1)-pred_ss1)^2)))
 
-
 #e) min_child weight:
 set.seed(12754)
 conv_mcw1= matrix(NA,500,length(mcw))
@@ -1017,8 +1040,6 @@ conv_mcw1= data.frame(iter=1:500, conv_mcw1)
 conv_mcw1= melt(conv_mcw1, id.vars = "iter")
 ggplot(data = conv_mcw1) + geom_line(aes(x = iter, y = value, color = variable))
 (RMSE_mcw1 = sqrt(colMeans((as.numeric(ytest1)-pred_mcw1)^2)))
-#we select the hyperparameter = 100 because of the same reason as above. 
-
 
 #f) Gamma: 
 set.seed(12897564)
@@ -1041,27 +1062,23 @@ ggplot(data = conv_gamma1) + geom_line(aes(x = iter, y = value, color = variable
 (RMSE_gamma1 = sqrt(colMeans((as.numeric(ytest1)-pred_gamma1)^2)))
 
 
-
 #Setting the values: 
 xgb2<- xgboost(data = xtrain1, label = ytrain1,
-                nrounds = 500)
+               nrounds = 500)
 
 #set these values manually by looking at RMSE values:
 params1 = list(eta = .05, colsample_bylevel = 1/3,
-              subsample = 1 , max_depth = 2,
-              min_child_weigth = 400)
+               subsample = 1 , max_depth = 2,
+               min_child_weigth = 400)
 params1
 
-
 xgb.train1 <- xgboost(data = xtrain1, label = ytrain1,
-                     params = params1,
-                     nrounds = 500, objective = "reg:squarederror")
-
+                      params = params1,
+                      nrounds = 500, objective = "binary:logistic")
 
 xgb.test1 <- xgboost(data = xtest1, label = ytest1,
-                    params = params1,
-                    nrounds = 500, objective = "reg:squarederror")
-
+                     params = params1,
+                     nrounds = 500, objective = "binary:logistic")
 
 # run test model
 y_pred1.1 <- predict(xgb.train1, xtest1)
@@ -1074,15 +1091,27 @@ r3<-ytest1 - y_pred1.1
 plot(r3, ylab = "residuals", main = "XGB residuals")
 qqnorm(r3)
 
-
-#Plot: 
+#Feature importance plots: 
 #get the first three trees
-xgb.plot.tree(model = xgb.train1, trees = 0:4)
+xgb.plot.tree(model = xgb.train1, trees = 0:2)
 xgb.plot.multi.trees(xgb.train1)
 importance_matrix1 <- xgb.importance(model = xgb.train1)
 importance_matrix1
 xgb.plot.importance(importance_matrix1, xlab = "Feature Importance")
 
+
+########################################### Confusion matrix ########################################
+#Calculating accuracy of the training model: 
+#First Converting predicted probabilities to class labels
+y_pred_class<- ifelse(y_pred > 0.5, 1, 0) 
+
+# Creating the confusion matrix manually:
+conf_matrix_training<- table(y_pred_class, ytest)
+conf_matrix_training
+
+#Calculating the accuracy of the training model:
+accuracy_training<- sum(diag(conf_matrix_training)) / sum(conf_matrix_training)
+accuracy_training
 
 ##################################### Neural Network ----
 nn.pred = predict(nn.model, newdata = nn.test.data)
