@@ -55,10 +55,6 @@ testgroup3$relief<- ifelse(testgroup3$Company.response.to.consumer %in% c("Close
 testgroup3$drop <- as.numeric(testgroup3$State %in% c("NONE", "None", "DC", "AA", "AS", "AP", "AE", "FM","GU", "MH", "MP", "PR", "VI", "UNITED STATES MINOR OUTLYING ISLANDS"))
 testgroup3 <- subset(testgroup3, !(State %in% c("AE", 'AP'))) #dropping military bases
 
-#older Americans and servicefolk
-testgroup3$servicemember <- ifelse(str_detect(testgroup3$Tags, "Servicemember"), 1, 0)
-testgroup3$olderAm <- ifelse(str_detect(testgroup3$Tags, "Older American"), 1, 0)
-
 fips_data <- fips_data[!fips_data$STATE %in% c("NONE", "None", "DC", "AA", "AS", 'AP', "AE", "FM","GU", "MH", "MP", "PR", "VI", "UNITED STATES MINOR OUTLYING ISLANDS"),]
 
 ctfips <-  (ifelse((fips_data$STATE == 'CT' & str_detect(fips_data$STCOUNTYFP, "9")), 
@@ -121,8 +117,11 @@ testgroup3 <- testgroup3 %>%
 
 #Dummy for after date (form changes NA imputation)
 testgroup3$Date.received <- as.Date(testgroup3$Date.received, format = "%m/%d/%y")
-
 testgroup3$Dispute_prior <- ifelse(testgroup3$Date.received  > as.Date('04/24/17', format= "%m/%d/%y"), 1,0)
+
+#older Americans and servicefolk
+testgroup3$servicemember <- ifelse(str_detect(testgroup3$Tags, "Servicemember"), 1, 0)
+testgroup3$olderAm <- ifelse(str_detect(testgroup3$Tags, "Older American"), 1, 0)
 
 #####Zip Code Cleaning#### -----
 USA_zippop <- zip_code_db
@@ -251,7 +250,7 @@ colnames(cleantest)
 temp <- cleantest[, c(32:52)]
 temp <- sapply(temp, as.numeric)
 
-imputation_map_pca_val <- is.na(temp)
+imputation_map_pca_val <- is.na(temp) #map of our imputations
 
 temp_imputed <- apply(temp, 2, function(x) {
   x[is.na(x)] <- mean(x, na.rm = TRUE)
@@ -344,7 +343,7 @@ colnames(ca) <- c("Sub.product",
 
 ca$medicaldebt <- as.factor(ifelse(ca$Sub.product == "Medical debt", 1,0))
 
-impute_map_medical_val <- is.na(ca)
+impute_map_medical_val <- is.na(ca) #imputation map for medical clusters
 
 # 2 cluster
 kpres2 <- kproto(x=ca[,c(2:7)], k=2, na.rm = 'imp.internal')
@@ -353,7 +352,7 @@ kpres2 <- kproto(x=ca[,c(2:7)], k=2, na.rm = 'imp.internal')
 kpres3 <- kproto(x=ca[,c(2:7)], k=3,  na.rm = 'imp.internal')
 
 # Plots
-clprofiles(kpres3, ca[,c(2:7)], col = wes_palette("Royal1", 4, type = "continuous")) #c('blue', 'red', 'green')) 
+clprofiles(kpres3, ca[,c(2:7)], col = wes_palette("Royal1", 4, type = "continuous")) 
 
 # scree plot
 
@@ -392,7 +391,7 @@ q9_test$Year <- as.factor(year(q9_test$Date.received))
 q9_test <- q9_test %>%
   select(Sub.product, Issue, Sub.issue, Consumer.consent.provided., Submitted.via, Timely.response. , relief, drop, 
          Dispute_prior, servicemember, olderAm, 
-         Fips, Pop_less25, Pop_over64, Pop_Hispanic, White, Black, Asian, Indigenous, Native, TotalMale, TotalFemale,
+         Fips, Pop_less25, Pop_over64, Pop_Hispanic, White, Black, Asian, Indigenous, Native, Multiple, TotalMale, TotalFemale,
          Share.of.people.of.color, Average.household.income..All, Average.household.income..Comm.of.color, Average.household.income..White.comm,
          Comp.1, Comp.2,Comp.3, Comp.4, MedicalDebtClusters,  Year)
 
@@ -411,3 +410,4 @@ q9_s_test <- q9_s_test %>%
   filter(complete.cases(.))
 
 write.csv(q9_s_test, "q9_s_test.csv")
+
