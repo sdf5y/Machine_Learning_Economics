@@ -113,7 +113,14 @@ testgroup3 <- testgroup3 %>%
                                                 Consumer.consent.provided. == "Consent not provided"  ~ "No consent provided",
                                                 Consumer.consent.provided. == "Other"  ~ "No consent provided",
                                                 Consumer.consent.provided. == "Consent withdrawn"   ~ "No consent provided",
-                                                Consumer.consent.provided. == "N/A" ~ "No consent provided"))
+                                                Consumer.consent.provided. == "N/A" ~ "No consent provided"),
+         Submitted.via = case_when(Submitted.via == 'Email' ~ 'Web',
+                                    Submitted.via == 'Phone' ~ 'Phone',
+                                    Submitted.via == 'Postal mail' ~ 'Postal mail',
+                                    Submitted.via == 'Referral' ~ 'Referral',
+                                    Submitted.via == 'Web' ~ 'Web',
+                                    Submitted.via == 'Web Referral' ~ 'Web Referral',
+                                    Submitted.via == 'Fax' ~ 'Fax'))
 
 #Dummy for after date (form changes NA imputation)
 testgroup3$Date.received <- as.Date(testgroup3$Date.received, format = "%m/%d/%y")
