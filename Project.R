@@ -116,8 +116,11 @@ group3 <- group3 %>%
 
 #Dummy for after date (form changes NA imputation)
 group3$Date.received <- as.Date(group3$Date.received, format = "%m/%d/%y")
-
 group3$Dispute_prior <- ifelse(group3$Date.received  > as.Date('04/24/17', format= "%m/%d/%y"), 1,0)
+
+#older Americans and servicefolk
+group3$servicemember <- ifelse(str_detect(group3$Tags, "Servicemember"), 1, 0)
+group3$olderAm <- ifelse(str_detect(group3$Tags, "Older American"), 1, 0)
 
 #####Zip Code Cleaning#### -----
 USA_zippop <- zip_code_db
@@ -210,7 +213,7 @@ unique_zips <- unique(group3$ZIP.code)
 zip_binary_map <- unique_zips %in% fips_data$ZIP
 table(zip_binary_map) #looks like there are no issues anymore 
  
-rm(i, zip, zip_binary_map, unique_zips, unclean_zips) #remove these variables when done.
+rm(i, zip, zip_binary_map, unique_zips) #remove these variables when done.
 
 #FIPS Fix ------
 
@@ -266,7 +269,7 @@ for (fip in unique_fips) {
   results_list[[fip]] <- result
   
   result2 <- census %>%
-    filter(census_fips == fip, YEAR == 1, AGEGRP >= 13 & AGEGRP <= 18) %>%
+    filter(census_fips == fip, YEAR == 1, AGEGRP >= 14 & AGEGRP <= 18) %>%
     summarise(TOTAL_POP = sum(TOT_POP))
   
   results_list2[[fip]] <- result2
@@ -290,37 +293,37 @@ county_demos <- county_demos[,-3]
 county_demos$TotalMale <- county_totals$TOT_MALE
 county_demos$TotalFemale <- county_totals$TOT_FEMALE
 
-#older Americans and servicefolk
-group3$servicemember <- ifelse(str_detect(group3$Tags, "Servicemember"), 1, 0)
-group3$olderAm <- ifelse(str_detect(group3$Tags, "Older American"), 1, 0)
-
 #Race counts per county
 
 races <- county_totals[,c("WA_MALE", "WA_FEMALE", "BA_MALE", "BA_FEMALE", 
-  "IA_MALE", "IA_FEMALE", "AA_MALE", "AA_FEMALE", "NA_MALE", "NA_FEMALE")]
+  "IA_MALE", "IA_FEMALE", "AA_MALE", "AA_FEMALE", "NA_MALE", "NA_FEMALE", "TOM_MALE", 'TOM_FEMALE')]
 
 tot_white <- rowSums(races[,1:2])
 tot_black <- rowSums(races[,3:4])
 tot_indigenous <- rowSums(races[,5:6])
-tot_asian <- rowSums(races[,6:7])
-tot_native <- rowSums(races[,7:8])
+tot_asian <- rowSums(races[,7:8])
+tot_native <- rowSums(races[,9:10])
+tot_two <- rowSums(races[,11:12])
 
 total_population <- data.frame(White = tot_white, 
                       Black = tot_black, 
                       Indigenous = tot_indigenous, 
                       Asian = tot_asian, 
                       Native = tot_native,
+                      Multiple = tot_two,
                       County_pop = county_totals$TOT_POP,
                       Fips = county_totals$census_fips)
 
+total_population$County_pop - rowSums(total_population[,1:6]) #residual census check
+
 county_demos <- left_join(county_demos, total_population, by = "Fips")
 
-result <- apply(county_demos[, 2:11], 2, function(x) {
+result <- apply(county_demos[, 2:12], 2, function(x) {
   x / total_population$County_pop
 })
 
-county_demos[,2:11] <- result
-county_demos <- county_demos[,-12]
+county_demos[,2:12] <- result
+county_demos <- county_demos[,-13]
 
 #Q6-----
 
@@ -341,10 +344,10 @@ write.csv(hopefully_all, 'hopefully.csv')
 #Q7------
 
 colnames(hopefully_all)
-temp <-  hopefully_all[, c(39:59)]
+temp <-  hopefully_all[, c(40:60)]
 temp <- sapply(temp, as.numeric)
 
-imputation_map <- is.na(temp)
+imputation_map <- is.na(temp) #map of our NA values before we imputate
 
 temp_imputed <- apply(temp, 2, function(x) {
   x[is.na(x)] <- mean(x, na.rm = TRUE)
@@ -384,7 +387,6 @@ qplot(c(1:21), variance_explained) +
   ggtitle("Scree Plot") +
   ylim(0, 100)    
 
-
 #get 4 components 
 feature_vector <- (debt.pca$loadings)
 feature_vector_transposed <- t(feature_vector)
@@ -404,7 +406,7 @@ comps <- data_reoriented_df[,c(1:4)]
 comps <- as.data.frame(comps)
 
 #now merge to the dataset
-temp2 <- cbind(hopefully_all[,-c(36:59)], comps)
+temp2 <- cbind(hopefully_all[,-c(37:60)], comps)
 
 colnames(temp2)
 
@@ -446,9 +448,7 @@ colnames(ca) <- c("Sub.product",
 
 ca$medicaldebt <- as.factor(ifelse(ca$Sub.product == "Medical debt", 1,0))
 
-count(is.na(ca))
-
-impute_map_medical <- is.na(ca)
+impute_map_medical <- is.na(ca) #map of imputation
 
 # 2 cluster
 kpres2 <- kproto(x=ca[,c(2:7)], k=2, na.rm = 'imp.internal')
@@ -488,8 +488,8 @@ q9$Year <- as.factor(year(q9$Date.received))
 
 q9 <- q9 %>%
   select(Sub.product, Issue, Sub.issue, Consumer.consent.provided., Submitted.via, Timely.response. , relief, drop, 
-         Dispute_prior, servicemember, olderAm, 
-  Fips, Pop_less25, Pop_over64, Pop_Hispanic, White, Black, Asian, Native, Indigenous, TotalMale, TotalFemale,
+         Dispute_prior, servicemember, olderAm, Fips, 
+         Pop_less25, Pop_over64, Pop_Hispanic, White, Black, Asian, Native, Indigenous, Multiple, TotalMale, TotalFemale,
   Share.of.people.of.color, Average.household.income..All, Average.household.income..Comm.of.color, Average.household.income..White.comm,
  Comp.1, Comp.2,Comp.3, Comp.4, MedicalDebtClusters,  Year)
 
