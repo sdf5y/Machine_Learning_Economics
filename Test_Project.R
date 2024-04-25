@@ -418,3 +418,93 @@ q9_s_test <- q9_s_test %>%
 
 write.csv(q9_s_test, "q9_s_test.csv")
 
+
+############################################## Validation XG BOOST #################################################
+q9_s_test<-read.csv("q9_s_test.csv")
+view(q9_s_test)
+attach(q9_s_test)
+
+
+#rec-coding email character: 
+q9_s_test <- q9_s_test %>%
+  mutate( Submitted.via = case_when(Submitted.via == 'Email' ~ 'Web',
+                                    Submitted.via == 'Phone' ~ 'Phone',
+                                    Submitted.via == 'Postal mail' ~ 'Postal mail',
+                                    Submitted.via == 'Referral' ~ 'Referral',
+                                    Submitted.via == 'Web' ~ 'Web',
+                                    Submitted.via == 'Fax' ~ 'Fax',
+                                    Submitted.via == 'Web Referral' ~ 'Web Referral'))
+
+
+#Dropping the index (X) variable: 
+q9_s_test<-q9_s_test%>%
+  select(-X)
+view(q9_s_test)
+
+table(q9_s_test$Submitted.via)
+
+#making them factors:
+q9_s_test<- data.frame(
+  lapply(q9_s_test, function(x) {
+    if(is.character(x)) factor(x) else x
+  })
+)
+
+colnames(q9_s) %in% colnames(q9_s_test)
+colnames(q9_s)
+colnames(q9_s_test)
+sapply(q9_s, class) %in% sapply(q9_s_test, class)
+
+set.seed(27514)
+
+#making them numeric matrix
+xtrain2<-sparse.model.matrix(relief ~. -1, data = q9_s_test)
+ytrain2<- as.array(q9_s_test$relief)
+ytrain2
+
+
+### run the default test XGBOOST model;
+xgb3<- xgboost(data = xtrain2, label = ytrain2,
+               nrounds = 500)
+
+#parameters coming from training data:
+params = list(eta = .05, colsample_bylevel = 1/3,
+              subsample = 1, max_depth = 2,
+              min_child_weigth = 400, gamma = 1)
+params
+
+#This is without class weights:
+#xgb.train1 <- xgboost(data = xtrain2, label = ytrain2,
+                     #params = params,
+                     #nrounds = 500, objective = "binary:logistic")
+
+#This is with class weights: 
+#xgb_model<- xgboost(data = xtrain2, label = ytrain2, 
+                     #weight = ifelse(ytrain2 == 1, 5, 1),params = params, 
+                   # nrounds = 500, objective = "binary:logistic")
+
+
+
+names(xgb.train)
+names(xtrain2)
+
+# run test model
+y_pred_test<- predict(xgb.train, xtrain2)
+y_pred_test
+
+hist(y_pred_test)
+quantile(y_pred_test, 0.95)
+
+y_pred_class1<- ifelse(y_pred_test > 0.5, 1, 0) 
+
+
+# Creating the confusion matrix manually:
+conf_matrix_test<- table(y_pred_class1, ytrain2)
+conf_matrix_test
+
+#Calculating the accuracy of the training model:
+accuracy_test<- sum(diag(conf_matrix_test)) / sum(conf_matrix_test)
+accuracy_test
+
+
+
