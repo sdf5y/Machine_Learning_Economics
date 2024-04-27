@@ -482,10 +482,7 @@ y_pred_class1<- ifelse(y_pred_test > 0.5, 1, 0)
 conf_matrix_test<- table(y_pred_class1, ytrain2)
 conf_matrix_test
 
-#F1 score = 0.8353
 
 #Calculating the accuracy of the training model:
 accuracy_test<- sum(diag(conf_matrix_test)) / sum(conf_matrix_test)
 accuracy_test
-
-
