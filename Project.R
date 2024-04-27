@@ -651,6 +651,34 @@ q9_s<- data.frame(
 
 
 ############################ XG Boost #######################################
+#Loading the training dataset: 
+q9_s<-read.csv("q9_s.csv")
+view(q9_s)
+
+#Subsetting the training data: 
+q9_s<- q9_s %>%
+  select(Sub.product, Issue, Sub.issue, Consumer.consent.provided., Submitted.via, Timely.response. , relief, drop, 
+         Dispute_prior, servicemember, olderAm,Fips, Pop_less25, Pop_over64, Pop_Hispanic, White, Black, Asian, Indigenous, Native, Multiple, TotalMale, TotalFemale,
+         Share.of.people.of.color, Average.household.income..All, Average.household.income..Comm.of.color, Average.household.income..White.comm,
+         Comp.1, Comp.2,Comp.3, Comp.4, MedicalDebtClusters,Year)
+
+view(q9_s)
+
+
+q9_s<- data.frame(
+  lapply(q9_s, function(x) {
+    if(is.character(x)) factor(x) else x
+  })
+)
+
+#Converting year to factor: 
+q9_s <- q9_s %>%
+  mutate(Year = factor(Year))
+
+
+
+
+############################ XG Boost #######################################
 set.seed(27514)
 split.imp <- sample.split(q9_s, SplitRatio = 0.7)
 train1 <-  subset(q9_s, split.imp == "TRUE")
@@ -868,7 +896,18 @@ importance_matrix <- xgb.importance(model = xgb.train)
 importance_matrix
 xgb.plot.importance(importance_matrix, xlab = "Feature Importance")
 
-hist(y_pred)
+
+#First Converting predicted probabilities to class labels
+y_pred_class<- ifelse(y_pred > 0.48, 1, 0) 
+
+# Creating the confusion matrix manually:
+conf_matrix_training<- table(y_pred_class, ytest)
+conf_matrix_training
+
+#Calculating the accuracy of the training model:
+accuracy_training<- sum(diag(conf_matrix_training)) / sum(conf_matrix_training)
+accuracy_training
+
 
 #################################### XG Boost without olderAM variable ##############################################
 
@@ -888,6 +927,12 @@ q9_s1<- data.frame(
     if(is.character(x)) factor(x) else x
   })
 )
+
+
+#Converting year to factor: 
+q9_s <- q9_s %>%
+  mutate(Year = factor(Year))
+
 
 set.seed(27514)
 split.imp1 <- sample.split(q9_s1, SplitRatio = 0.7)
@@ -1069,11 +1114,11 @@ xgb2<- xgboost(data = xtrain1, label = ytrain1,
 #set these values manually by looking at RMSE values:
 params1 = list(eta = .05, colsample_bylevel = 1/3,
                subsample = 1 , max_depth = 2,
-               min_child_weigth = 400)
+               min_child_weigth = 400, gamma = 1)
 params1
 
 xgb.train1 <- xgboost(data = xtrain1, label = ytrain1,
-                      params = params1,
+                      params = params1,weight = ifelse(ytrain1 == 1, 5, 1),
                       nrounds = 500, objective = "binary:logistic")
 
 xgb.test1 <- xgboost(data = xtest1, label = ytest1,
@@ -1099,19 +1144,6 @@ importance_matrix1 <- xgb.importance(model = xgb.train1)
 importance_matrix1
 xgb.plot.importance(importance_matrix1, xlab = "Feature Importance")
 
-
-########################################### Confusion matrix ########################################
-#Calculating accuracy of the training model: 
-#First Converting predicted probabilities to class labels
-y_pred_class<- ifelse(y_pred > 0.5, 1, 0) 
-
-# Creating the confusion matrix manually:
-conf_matrix_training<- table(y_pred_class, ytest)
-conf_matrix_training
-
-#Calculating the accuracy of the training model:
-accuracy_training<- sum(diag(conf_matrix_training)) / sum(conf_matrix_training)
-accuracy_training
 
 ##################################### Neural Network ----
 nn.pred = predict(nn.model, newdata = nn.test.data)
