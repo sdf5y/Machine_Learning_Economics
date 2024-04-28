@@ -539,92 +539,158 @@ test <- subset(q9_s, split == "FALSE")
 
 #Q10-----
 
-#logit----
-logit_m <- glm(relief ~ (`log Share.of.people.of.color`), data = train)
+#Linear Probability (Lasso):----
+set.seed(03110) 
 
-plot(logit_m)
+X <- model.matrix(relief ~ ., data = q9_s)[, -1]  
+Y <- q9_s$relief
+# Define class weights
+class_weights <- ifelse(Y == 1, 5, 1)
 
-summary(logit_m)
+cv_fit <- cv.glmnet(X, Y, alpha = 1, family = "gaussian", nfolds = 10, weights = class_weights)
 
-model <- train(relief ~ Share.of.people.of.color, data = q9_s,  
-               method = "glm", 
-               trControl = train_control)
+optimal_lambda <- cv_fit$lambda.min
 
-forward_glm <- step(, direction = "forward", scope = formula(~ .))
-backward_glm <- step(, direction = "backward", scope = formula(~ .))  
-step_glm <- step(, direction = "both", scope = formula(~ .)) 
+predicted_probs <- predict(cv_fit, newx = X, s = "lambda.min", type = "response")
+predicted_classes <- ifelse(predicted_probs > 0.5, 1, 0)
 
-#Lasso ----
-library(glmnet)
+classification_error <- mean(predicted_classes != Y)
+print(paste("Classification Error:", classification_error))
 
-X <- model.matrix(q9_2$relief ~., data = q9_2)[, -1]  # Predictors
-Y <- q9_2$relief
+residuals <- as.numeric(Y) - predicted_probs
+qqnorm(residuals)
+qqline(residuals)
 
-#Lasso logistic regression model with 10-fold cross-validation
-logit_model <- cv.glmnet(X, Y, alpha = 1, family = "binomial", link = "logit", nfolds = 10, newx = X)
+library(caret)
+
+conf_matrix <- confusionMatrix(factor(predicted_classes), factor(Y))
+
+print(conf_matrix)
+#F1 0.278
+#Note: We found that packages such as MLmetrics, which calculate F1 scores internally, were massively overinflating our F1 scores, so we calculated them all by hand using the confusion matricies.
+
+#Logit (Lasso):----
+set.seed(03110) 
+
+# Define class weights
+
+X <- model.matrix(relief ~ ., data = q9_s)[, -1]  
+Y <- q9_s$relief
+class_weights <- ifelse(Y == 1, 5, 1)
+
+cv_fit <- cv.glmnet(X, Y, alpha = 1, family = "binomial", link = "logit", nfolds = 10, weights = class_weights)
+
+optimal_lambda <- cv_fit$lambda.min
+
+predicted_probs <- predict(cv_fit, newx = X, s = "lambda.min", type = "response")
+predicted_classes <- predict(cv_fit, newx = X, s = "lambda.min", type = "class")
+
+classification_error <- mean(predicted_classes != Y)
+print(paste("Classification Error:", classification_error))
+
+residuals <- as.numeric(Y) - predicted_probs
+qqnorm(residuals)
+qqline(residuals)
 
 
-coef(logit_model, s = "lambda.min")
+library(caret)
+
+predicted_classes <- ifelse(predicted_probs > 0.5, 1, 0)
+
+conf_matrix <- confusionMatrix(factor(predicted_classes), factor(Y))
+
+print(conf_matrix)
+
+#F1 0.292
 
 #Regression tree ------
-intrain <- createDataPartition(y = q9_s$relief, p= 0.8)[[1]]
-train_q9_s <- q9_s[intrain,]
-test_q9_s <- q9_s[-intrain,]
-
 library(rpart)
 library(rpart.plot)
+library(MLmetrics)
 
+set.seed(082020)
 minsplit <- 20
 
-rpart.control_params <- rpart.control(minsplit = 20, minbucket = round(minsplit/3), cp = 0.00001,
-              maxcompete = 4, maxsurrogate = 5, usesurrogate = 2, xval = 10,
-              surrogatestyle = 0, maxdepth = 30)
+# Define class weights
+class_weights <- ifelse(q9_s$relief == 1, 5, 1)
 
-relief.tree <- rpart(relief~., data= train_q9_s, control = rpart.control_params, method = "class")
+rpart.control_params <- rpart.control(minsplit = minsplit, minbucket = round(minsplit/3), cp = 0.01,
+                                      maxcompete = 4, maxsurrogate = 5, usesurrogate = 2, xval = 10,
+                                      surrogatestyle = 0, maxdepth = 30)
+
+
+relief.tree <- rpart(relief ~ ., data = q9_s, control = rpart.control_params, method = "class", weights = class_weights)
+
 
 summary(relief.tree)
 
+
 rpart.plot(relief.tree)
+
 
 relief.tree$variable.importance
 
-#Predictions
-predicted_labels <- predict(relief.tree, newdata = test_q9_s, type = "class")
 
-#misclassification rate
-misclassification_rate <- mean(predicted_labels != test_q9_s$relief)
+predicted_labels <- predict(relief.tree, type = "class")
 
-print(misclassification_rate
+misclassification_rate <- mean(predicted_labels != q9_s$relief)
+
+print(misclassification_rate)
+
+library(caret)
+
+#predicted_classes <- ifelse(predicted_probs > 0.5, 1, 0)
+
+conf_matrix <- confusionMatrix(factor(predicted_labels), factor(Y))
+
+print(conf_matrix)
+
+#F1 0.279
       
-######################################### Random forest ###############################################
+# Random forest----
+library(caret)
+library(randomForest)
+
+X <- model.matrix(relief ~ ., data = q9_s)[, -1]
+Y <- q9_s$relief
+class_weights <- ifelse(Y == 1, 5, 1)
+
 set.seed(275142)
-RF<- randomForest(relief~., data= q9_s,
-                             importance=TRUE, ntree=500)
 
-RF
+ctrl <- trainControl(classProbs = TRUE, method = "cv", number = 10)
 
-#Checking at importance: 
-RF$importance
+RF <- train(relief ~ ., data = q9_s, method = "rf",
+            trControl = ctrl, importance = TRUE, ntree = 500,
+            class.weights = class_weights, verbose = TRUE)
 
-#Importance frame: 
-importance_frame <- measure_importance(RF)
-importance_frame
+# Importance frame
+importance_frame <- varImp(RF)
+print(importance_frame)
 
-### plot variable depth
-min_depth_frame<- min_depth_distribution(RF)
-head(min_depth_frame, n = 10)
-plot_min_depth_distribution(min_depth_frame)
+# Plot variable depth
+plot(varImpPlot(RF))
 
-### Plot multiway importance
-plot_multi_way_importance(importance_frame, size_measure = "no_of_nodes")
+# Conditional min depth
+# Picking the 5 most important variables
+vars <- rownames(importance_frame)[1:5]
+interactions_frame <- minDepthInteraction(RF, predictors = vars)
+print(interactions_frame)
+plot(interactions_frame)
 
-### conditional min depth
-## pick 5 most important variables
-(vars <- important_variables(importance_frame, k = 5, measures =
-                               c("mean_min_depth", "no_of_trees")))
-interactions_frame <- min_depth_interactions(RF, vars)
-head(interactions_frame[order(interactions_frame$occurrences, decreasing = TRUE), ])
-plot_min_depth_interactions(interactions_frame)
+
+misclassification_rate <- mean(predicted_labels != q9_s$relief)
+
+print(misclassification_rate)
+
+library(caret)
+
+predicted_labels <- ifelse(predicted_probs > 0.5, 1, 0)
+
+conf_matrix <- confusionMatrix(factor(predicted_labels), factor(Y))
+
+print(conf_matrix)
+
+#F1: 0.28
 
 ################################################ XG Boost #######################################################
 #Loading the training dataset: 
