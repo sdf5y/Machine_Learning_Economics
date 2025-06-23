@@ -1,4 +1,4 @@
-setwd("C:/Users/18045/Documents/R/ML/ML Project") #Sean's WD
+#setwd("") #Sean's WD
 #setwd("") #Nirav's WD
 #setwd("") #Elise's WD
 #setwd("") #Isaac's WD
